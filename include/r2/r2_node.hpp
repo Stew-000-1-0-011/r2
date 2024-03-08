@@ -1,3 +1,9 @@
+/**
+ * @file r2_node.hpp
+ * @brief R2のメインノードを定義する
+ * @todo タイマ周期が複数箇所で指定されており、危険。直す良い方法を検討する
+ */
+
 #pragma once
 
 #include <memory>
@@ -21,12 +27,13 @@
 
 #include <include/xyth.hpp>
 #include <include/pid.hpp>
+#include <include/mutexed.hpp>
 #include <include/debug_print.hpp>
 
 #include "state_machine.hpp"
 #include "main.hpp"
 #include "path_parser.hpp"
-#include "geometry_msgs_convertor.hpp"
+#include "ros2_utils.hpp"
 #include "shirasu.hpp"
 #include "robot_config.hpp"
 
@@ -36,6 +43,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using xyth::Xy;
 	using xyth::Xyth;
 	using pid::Pid;
+	using mutexed::Mutexed;
 	using debug_print::printlns;
 	using state_machine::StateBase;
 	using state_machine::StateMachine;
@@ -43,7 +51,8 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using main::GotoArea;
 	using Dancing = main::Dancing<std::chrono::system_clock>;
 	using path_parser::path_load;
-	using geometry_msgs_convertor::MsgConvertor;
+	using ros2_utils::get_pose;
+	using ros2_utils::get_system_timepoint;
 	using shirasu::Command;
 	using shirasu::command_frame;
 	using shirasu::target_frame;
@@ -52,29 +61,6 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using ThPid = Pid<double, double>;
 	
 	namespace {
-		template<class T_>
-		struct Mutexed final {
-			std::shared_mutex mtx;
-			T_ val;
-
-			static auto make(T_ v) -> Mutexed<T_> {
-				return Mutexed<T_> {
-					{}
-					, v
-				};
-			}
-
-			auto get() -> T_ {
-				std::shared_lock lock(mtx);
-				return val;
-			}
-
-			void set(T_ v) {
-				std::lock_guard lock(mtx);
-				val = v;
-			}
-		};
-
 		struct R2Node final : rclcpp::Node {
 			Mutexed<GotoArea::In> goto_area_in;
 			Mutexed<Dancing::In> dancing_in;
@@ -102,7 +88,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				}
 				, dancing_in {
 					Mutexed<Dancing::In>::make(Dancing::In {
-						this->get_system_timepoint()
+						get_system_timepoint(*this->get_clock())
 						, (10ms).count()
 					})
 				}
@@ -143,8 +129,8 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 
 			void timer_callback() {
-				auto now = this->get_system_timepoint();
-				const auto current_pose = this->get_current_pose();
+				auto now = get_system_timepoint(*this->get_clock());
+				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
 				this->goto_area_in.set(GotoArea::In {
 					current_pose ? *current_pose : this->goto_area_in.get().current_pose
 					, (10ms).count()
@@ -161,24 +147,6 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 						this->can_tx->publish(target_frame(*robot_config::ids[i], motor_speeds[i]));
 						rclcpp::sleep_for(200us);
 					}
-				}
-			}
-
-			auto get_system_timepoint() -> std::chrono::system_clock::time_point {
-				return std::chrono::system_clock::time_point{std::chrono::system_clock::duration{this->get_clock()->now().nanoseconds()}};
-			}
-
-			auto get_current_pose() -> std::optional<Xyth> {
-				try {
-					const auto transform = tf2_buffer.lookupTransform("map", "base_link", tf2::TimePointZero).transform;
-					const auto v = transform.translation;
-					double roll, pitch, yaw;
-					tf2::Matrix3x3{MsgConvertor<tf2::Quaternion, geometry_msgs::msg::Quaternion>::fromMsg(transform.rotation)}
-						.getRPY(roll, pitch, yaw);
-					return Xyth::make(Xy::make(v.x, v.y), yaw);
-				} catch(const tf2::TransformException& e) {
-					RCLCPP_ERROR(this->get_logger(), "r2_node:  %s", e.what());
-					return std::nullopt;
 				}
 			}
 
