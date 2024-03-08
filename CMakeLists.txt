@@ -14,6 +14,7 @@ find_package(ament_cmake REQUIRED)
 # find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)  #
 find_package(std_msgs REQUIRED)  #
+find_package(sensor_msgs REQUIRED)  #
 find_package(tf2 REQUIRED)  #
 find_package(tf2_ros REQUIRED)  #
 find_package(tf2_geometry_msgs REQUIRED)  #
@@ -41,6 +42,21 @@ ament_target_dependencies(r2_node
 )
 
 # 
+add_executable(filter_node
+  src/filter_node.cpp
+)
+ament_target_dependencies(filter_node
+  rclcpp
+  std_msgs
+  sensor_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  nav2_msgs
+  can_plugins2
+)
+
+# 
 add_executable(hoge_node
   src/hoge.cpp
 )
@@ -56,6 +72,7 @@ ament_target_dependencies(hoge_node
 install(
   TARGETS
     r2_node  #
+    filter_node  #
     hoge_node  #
   DESTINATION lib/${PROJECT_NAME}
 )

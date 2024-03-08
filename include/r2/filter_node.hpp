@@ -1,157 +1,107 @@
 #pragma once
 
-#include <cmath>
-#include <functional>
 #include <utility>
+
 #include <rclcpp/rclcpp.hpp>
+
 #include <sensor_msgs/msg/laser_scan.hpp>
-#include <visualization_msgs/msg/marker.hpp>
-#include <nhk24_utils/msg/filter_param.hpp>
 
-#include <nhk24_utils/std_type.hpp>
-#include <nhk24_utils/vec2d.hpp>
-#include <nhk24_utils/scan.hpp>
-#include "laser_filters.hpp"
-#include "segment_line.hpp"
+#include <tf2/LinearMath/Transform.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <tf2/exceptions.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
-namespace nhk24_use_amcl::stew::filter_node::impl {
-	using namespace crs_lib::integer_types;
-	using Vec2d = nhk24_utils::stew::vec2d::Vec2d_<float>;
-	using nhk24_utils::stew::scan::Scan;
-	using laser_filters::filter_chain;
-	using laser_filters::ShadowFilter;
-	using laser_filters::BoxFilter;
-	using segment_line::SegmentLine;
+#include <include/xyth.hpp>
 
-	struct FilterNode final : rclcpp::Node
-	{
-		rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub_scan;
-		rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_marker;
-		rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub_scan;
-		rclcpp::Subscription<nhk24_utils::msg::FilterParam>::SharedPtr sub_filter_param;
-		u16 seg_window;
-		float seg_threshold;
-		Vec2d base_to_lidar;
-		Vec2d footprint_size;
-		float shadow_filter_threshold_angle;
-		u16 shadow_filter_window;
+#include "ros2_utils.hpp"
+#include "lidar_filter.hpp"
+#include "robot_config.hpp"
 
-		FilterNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions{})
-			: Node("nhk24_1st_filter_node", options)
-			, pub_scan(create_publisher<sensor_msgs::msg::LaserScan>("scan", 10))
-			, pub_marker(create_publisher<visualization_msgs::msg::Marker>("segment_line", 10))
-			, sub_scan(create_subscription<sensor_msgs::msg::LaserScan>("scan_nonfiltered", 10, std::bind(&FilterNode::scan_callback, this, std::placeholders::_1)))
-			, sub_filter_param(create_subscription<nhk24_utils::msg::FilterParam>("filter_param", 10, std::bind(&FilterNode::callback_filter_param, this, std::placeholders::_1)))
-			, seg_window(10)
-			, seg_threshold(0.100f)
-			, base_to_lidar(0.000, -0.000)
-			, footprint_size(0.500f, 0.500f)
-			, shadow_filter_threshold_angle(0.100f)
-			, shadow_filter_window(10)
-		{}
+namespace nhk24_2nd_ws::r2::filter_node::impl {
+	using nhk24_2nd_ws::xyth::Xy;
+	using nhk24_2nd_ws::xyth::Xyth;
+	using nhk24_2nd_ws::r2::ros2_utils::get_pose;
+	using nhk24_2nd_ws::r2::lidar_filter::LidarScan;
+	using nhk24_2nd_ws::r2::lidar_filter::BoxFilter;
+	using nhk24_2nd_ws::r2::lidar_filter::ShadowFilter;
+	using nhk24_2nd_ws::r2::lidar_filter::filter_chain;
+	using nhk24_2nd_ws::r2::lidar_filter::apply_filter;
+	using nhk24_2nd_ws::r2::robot_config::footprint_half_diagonal;
+	using nhk24_2nd_ws::r2::robot_config::area_half_diagonal;
+	using nhk24_2nd_ws::r2::robot_config::shadow_filter_threshold_angle;
+	using nhk24_2nd_ws::r2::robot_config::shadow_window;
 
-		private:
-		void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+	struct FilterNode final : rclcpp::Node {
+		tf2_ros::Buffer tf_buffer;
+		tf2_ros::TransformListener tf_listener;
+
+		rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub;
+		rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub;
+		
+		FilterNode()
+			: Node("filter_node")
+			, tf_buffer(this->get_clock())
+			, tf_listener(tf_buffer)
+			, pub(create_publisher<sensor_msgs::msg::LaserScan>("scan", 1))
+			, sub(create_subscription<sensor_msgs::msg::LaserScan>("scan_nonfiltered", 1, [this](const sensor_msgs::msg::LaserScan::SharedPtr msg) {
+				this->callback(std::move(msg));
+			}))
 		{
-			auto[scan, filtered_msg] = Scan::from_msg(std::move(*msg));
-
-			const auto chain = filter_chain(
-				ShadowFilter::make(this->shadow_filter_threshold_angle, this->shadow_filter_window)
-				, BoxFilter::make(this->base_to_lidar, this->footprint_size)
-			);
-
-			auto seg_line = SegmentLine::make(this->seg_window, this->seg_threshold);
-			for(u16 i = 0; i < scan.rs.size(); ++i)
-			{
-				scan.rs[i] = chain(scan, i);
-				seg_line = std::move(seg_line).update(scan, i);
-			}
-
-			auto marker_msg = make_marker(filtered_msg, scan, seg_line.indices);
-			pub_marker->publish(marker_msg);
-
-			filtered_msg.ranges = std::move(scan.rs);
-
-			pub_scan->publish(filtered_msg);
+			RCLCPP_INFO(get_logger(), "filter_node has been started");
 		}
 
-		void callback_filter_param(const nhk24_utils::msg::FilterParam::SharedPtr msg)
-		{
-			if(msg->seg_window != 0) seg_window = msg->seg_window;
-			if(msg->seg_threshold != 0.0) seg_threshold = msg->seg_threshold;
-			if(const auto v = Vec2d{msg->base_to_lidar_x, msg->base_to_lidar_y}; v.norm2() != 0.0) base_to_lidar = v;
-			if(const auto v = Vec2d{msg->footprint_size_x, msg->footprint_size_y}; v.norm2() != 0.0) footprint_size = v;
-			if(msg->shadow_threshold_angle != 0.0) shadow_filter_threshold_angle = msg->shadow_threshold_angle;
-			if(msg->shadow_window != 0) shadow_filter_window = msg->shadow_window;
+		void callback(sensor_msgs::msg::LaserScan::SharedPtr msg) {
+			auto scan = LidarScan::make(std::move(msg->ranges), msg->angle_min, msg->angle_max);
+			const auto lidar_pose = get_pose(tf_buffer, "map", "lidar_link");
+			const auto base_pose = get_pose(tf_buffer, "map", "base_link");
 
-			RCLCPP_INFO (
-				this->get_logger()
-				, "filter_param: window=%d"
-					", threshold=%f"
-					", base_to_lidar=(%f, %f)"
-					", footprint_size=(%f, %f)"
-					", shadow_threshold_angle=%f"
-					", shadow_window=%d"
-				, seg_window
-				, seg_threshold
-				, base_to_lidar.x
-				, base_to_lidar.y
-				, footprint_size.x
-				, footprint_size.y
-				, shadow_filter_threshold_angle
-				, shadow_filter_window
-			);
-		}
-
-		static auto make_marker(const auto& filtered_msg, const Scan& scan, const std::vector<u16>& indices) -> visualization_msgs::msg::Marker {
-			auto scale = geometry_msgs::msg::Vector3{};
-			scale.x = 0.01;
-
-			auto color = std_msgs::msg::ColorRGBA{};
-			color.r = 0.0;
-			color.g = 1.0;
-			color.b = 0.0;
-			color.a = 1.0;
-
-			auto points = std::vector<geometry_msgs::msg::Point>();
-			points.reserve(indices.size());
-			for(const auto i : indices)
-			{
-				const auto p = scan.nth_rtheta(i).to_vec2d();
-				geometry_msgs::msg::Point point{};
-				point.x = p.x;
-				point.y = p.y;
-				point.z = 0.0;
-				points.push_back(point);
+			if(not lidar_pose) {
+				RCLCPP_ERROR(get_logger(), lidar_pose.error().c_str());
+				return;
+			}
+			if(not base_pose) {
+				RCLCPP_ERROR(get_logger(), base_pose.error().c_str());
+				return;
 			}
 
-			auto marker_msg = visualization_msgs::msg::builder::Init_Marker_header()
-				.header(filtered_msg.header)
-				.ns("segment_line")
-				.id(0)
-				.type(visualization_msgs::msg::Marker::LINE_STRIP)
-				.action(visualization_msgs::msg::Marker::ADD)
-				.pose(geometry_msgs::msg::Pose{})
-				.scale(scale)
-				.color(color)
-				.lifetime(rclcpp::Duration::from_nanoseconds(0))
-				.frame_locked(false)
-				.points(std::move(points))
-				.colors(std::vector<std_msgs::msg::ColorRGBA>{})
-				.texture_resource("")
-				.texture(sensor_msgs::msg::CompressedImage{})
-				.uv_coordinates(std::vector<visualization_msgs::msg::UVCoordinate>{})
-				.text("")
-				.mesh_resource("")
-				.mesh_file(visualization_msgs::msg::MeshFile{})
-				.mesh_use_embedded_materials(false)
-			;
+			auto chained = filter_chain (
+				BoxFilter::make (
+					*lidar_pose
+					, *base_pose
+					, footprint_half_diagonal
+				)
+				, BoxFilter::make (
+					*lidar_pose
+					, Xyth::make(area_half_diagonal, 0.0)
+					, area_half_diagonal
+				)
+				, ShadowFilter::make (
+					shadow_filter_threshold_angle
+					, shadow_window
+					, scan
+				)
+			);
 
-			return marker_msg;
+			auto filtered_scan = apply_filter(std::move(scan), std::move(chained));
+
+			sensor_msgs::msg::LaserScan filtered_scan_msg{};
+			filtered_scan_msg.header = msg->header;
+			filtered_scan_msg.angle_min = msg->angle_min;
+			filtered_scan_msg.angle_max = msg->angle_max;
+			filtered_scan_msg.angle_increment = msg->angle_increment;
+			filtered_scan_msg.time_increment = msg->time_increment;
+			filtered_scan_msg.scan_time = msg->scan_time;
+			filtered_scan_msg.range_min = msg->range_min;
+			filtered_scan_msg.range_max = msg->range_max;
+			filtered_scan_msg.ranges = std::move(filtered_scan.range);
+			filtered_scan_msg.intensities = std::move(msg->intensities);
+			
+			pub->publish(filtered_scan_msg);
 		}
 	};
 }
 
-namespace nhk24_use_amcl::stew::filter_node {
-	using impl::FilterNode;
+namespace nhk24_2nd_ws::r2::filter_node {
+	using nhk24_2nd_ws::r2::filter_node::impl::FilterNode;
 }
