@@ -13,19 +13,28 @@
 #include <include/std_types.hpp>
 #include <include/xyth.hpp>
 
+#include "robot_config.hpp"
+
 namespace nhk24_2nd_ws::r2::omni4::impl {
 	using xyth::Xy;
 	using xyth::Xyth;
 	using xyth::XyOp;
+	using robot_config::max_v;
+	using robot_config::max_a;
+	using robot_config::max_vxy;
+	using robot_config::max_vth;
+	using robot_config::max_axy;
+	using robot_config::max_ath;
+	using robot_config::center_to_wheel;
+	using robot_config::wheel_radius;
+	using robot_config::wheel_to_motor_ratio;
 
 	/**
 	 * @brief 速度上限や加速度上限を考慮して、モーターの速度を制限する
 	 * 
 	 */
 	struct MotorSpeedFixer final {
-		/// @todo 以下の値を適切に設定する -> したつもり
-		static constexpr double max_v = 500.0 * 0.5;  // 最大速度[rad/s]
-		static constexpr double max_a = 500.0 * 0.3;  // 最大加速度[rad/s^2]
+		
 
 		double last_v{0.0};
 
@@ -54,12 +63,6 @@ namespace nhk24_2nd_ws::r2::omni4::impl {
 	 * 
 	 */
 	struct BodySpeedFixer final {
-		/// @todo 以下の値を適切に設定する -> したつもり
-		static constexpr double max_vxy = 1.0 * 0.3;  // 最大並進速度[m/s]
-		static constexpr double max_vth = std::numbers::pi / 3.0 * 0.3;  // 最大角速度[rad/s]
-		static constexpr double max_axy = 1.0 * 0.1;  // 最大並進加速度[m/s^2]
-		static constexpr double max_ath = std::numbers::pi / 3.0 * 0.1;  // 最大角加速度[rad/s^2]
-
 		Xyth last_velocity{Xyth::zero()};
 
 		constexpr auto update(const Xyth& velocity, const double dt) noexcept -> Xyth {
@@ -104,11 +107,6 @@ namespace nhk24_2nd_ws::r2::omni4::impl {
 	namespace {
 		struct Omni4 final {
 			private:
-			/// @todo 以下の値を適切に設定する -> したつもり
-			static constexpr double center_to_wheel = 0.504;  // 中心から駆動輪までの距離[m]
-			static constexpr double wheel_radius = 0.060;  // 駆動輪の半径[m](雑)
-			static constexpr double wheel_to_motor_ratio = 33.45;  // 駆動輪からモーターへの倍速比
-
 			BodySpeedFixer body_velocity_fixer{};
 			std::array<MotorSpeedFixer, 4> motor_velocity_fixers{};
 
