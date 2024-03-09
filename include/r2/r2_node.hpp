@@ -135,7 +135,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 
 			void timer_callback() {
-				printlns("r2_node: timer_callback");
+				// printlns("r2_node: timer_callback");
 				// input
 				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
 				if(current_pose.has_value()) {
