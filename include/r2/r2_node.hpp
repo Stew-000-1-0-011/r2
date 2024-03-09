@@ -113,7 +113,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				, load_map_client(create_client<nav2_msgs::srv::LoadMap>("nav2/load_map"))
 				, timer{}
 			{
-				timer = create_wall_timer(10ms, [this]() {
+				this->timer = this->create_wall_timer(10ms, [this]() {
 					this->timer_callback();
 				});
 			}
@@ -135,6 +135,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 
 			void timer_callback() {
+				printlns("r2_node: timer_callback");
 				// input
 				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
 				if(current_pose.has_value()) {
