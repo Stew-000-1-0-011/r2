@@ -53,6 +53,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using main::TemporaryManual;
 	using main::GotoArea;
 	using main::Dancing;
+	using main::GoUpSlope;
 	using path_parser::path_load;
 	using ros2_utils::get_pose;
 	using shirasu::target_frame;
@@ -218,11 +219,55 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 
 			auto goto_area2() -> std::unique_ptr<StateBase> {
-				return this->goto_area("path/to_area2.txt", [this](){return this->goto_area3();}, [this]{return this->to_manual(this->goto_area2());});
+				return this->goto_area("path/to_area2.txt", [this]() {
+					return this->go_up_slope (
+						[this]{return this->goto_area3();}
+						, [this]{return this->goto_area2();}
+					);
+				}
+				, [this] {
+					return this->to_manual(this->goto_area2());
+				});
 			}
 
 			auto goto_area3() -> std::unique_ptr<StateBase> {
-				return this->goto_area("path/to_area3.txt", [this](){return this->dancing(2s, true);}, [this]{return this->to_manual(this->goto_area3());});
+				return this->goto_area("path/to_area3.txt", [this]() {
+					return this->go_up_slope (
+					[this]{return this->dancing(2s, true);}
+					, [this]{return this->goto_area3();}
+					);
+				}
+				, [this] {
+					return this->to_manual(this->goto_area3());
+				});
+			}
+
+			auto go_up_slope(auto&& next_state, auto&& recover_manual) -> std::unique_ptr<StateBase>
+			requires requires {
+				{next_state()} -> std::same_as<std::unique_ptr<StateBase>>;
+				{recover_manual()} -> std::same_as<std::unique_ptr<StateBase>>;
+			}
+			{
+				auto state = make_state<GoUpSlope> (
+					GoUpSlope::Content::make()
+					, [this]() -> GoUpSlope::In {
+						rclcpp::sleep_for(10ms);
+						const auto change_to_manual = this->change_mode.get() == Mode::manual;
+
+						return GoUpSlope::In {
+							change_to_manual
+						};
+					}
+					, [this](GoUpSlope::Out&& out) {
+						this->motor_speeds.set(out.motor_speeds);
+					}
+					, [this, next_state = std::move(next_state), recover_manual = std::move(recover_manual)](GoUpSlope::TransitArg&& targ) mutable {
+						if(not targ.change_to_manual) return next_state();
+						else return this->to_manual(recover_manual());
+					}
+				);
+
+				return std::make_unique<decltype(state)>(std::move(state));
 			}
 
 			auto dancing(const std::chrono::seconds& duration, const bool left_turn) -> std::unique_ptr<StateBase> {

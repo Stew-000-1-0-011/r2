@@ -110,6 +110,43 @@ namespace nhk24_2nd_ws::r2::main::impl {
 			}
 		};
 
+		struct GoUpSlope final {
+			struct In final {
+				bool change_to_manual;
+			};
+
+			struct Out final {
+				std::array<double, 4> motor_speeds;
+			};
+
+			struct TransitArg final {
+				bool change_to_manual;
+			};
+
+			struct Content final {
+				Omni4 omni;
+				LapTimer dt_timer;
+				LapTimer climb_slope_timer;
+
+				static auto make() -> Content {
+					return Content {
+						Omni4::make()
+						, LapTimer::make()
+						, LapTimer::make()
+					};
+				}
+			};
+
+			static auto update(Content& s, In&& in) -> std::tuple<Out, std::optional<TransitArg>> {
+				return {
+					Out{s.omni.update(Xyth::make(Xy::make(0.0, 0.5), 0.0), s.dt_timer.update().count())}
+					, in.change_to_manual ? std::optional<TransitArg>{TransitArg{true}}
+						: s.climb_slope_timer.watch() > std::chrono::seconds{5} ? std::optional<TransitArg>{TransitArg{false}}
+							: std::nullopt
+				};
+			}
+		};
+
 		struct Dancing final {
 			struct In final {
 				bool change_to_manual;
@@ -167,4 +204,5 @@ namespace nhk24_2nd_ws::r2::main {
 	using impl::GotoArea;
 	using impl::Dancing;
 	using impl::TemporaryManual;
+	using impl::GoUpSlope;
 }
