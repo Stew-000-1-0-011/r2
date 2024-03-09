@@ -16,6 +16,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/empty.hpp>
 #include <nav2_msgs/srv/load_map.hpp>
+#include <sensor_msgs/msg/joy.hpp>
 
 #include <tf2/LinearMath/Transform.h>
 #include <tf2/LinearMath/Matrix3x3.h>
@@ -35,6 +36,7 @@
 #include "path_parser.hpp"
 #include "ros2_utils.hpp"
 #include "shirasu.hpp"
+#include "logicool.hpp"
 #include "robot_config.hpp"
 
 namespace nhk24_2nd_ws::r2::r2_node::impl {
@@ -48,22 +50,29 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using state_machine::StateBase;
 	using state_machine::StateMachine;
 	using state_machine::make_state;
+	using main::TemporaryManual;
 	using main::GotoArea;
-	using Dancing = main::Dancing<std::chrono::system_clock>;
+	using main::Dancing;
 	using path_parser::path_load;
 	using ros2_utils::get_pose;
-	using ros2_utils::get_system_timepoint;
-	using shirasu::Command;
-	using shirasu::command_frame;
 	using shirasu::target_frame;
+	using logicool::Axes;
+	using logicool::Buttons;
 
 	using XyPid = Pid<Xy, double, pid::trivial, xyth::XyOp{}, xyth::XyOp{}>;
 	using ThPid = Pid<double, double>;
 	
+	enum class Mode : u8 {
+		manual
+		, automatic
+	};
+
 	namespace {
 		struct R2Node final : rclcpp::Node {
-			Mutexed<GotoArea::In> goto_area_in;
-			Mutexed<Dancing::In> dancing_in;
+			Mutexed<Xyth> current_pose;
+			Mutexed<Xyth> manual_speed;
+			Mutexed<std::optional<Mode>> change_mode;
+
 			Mutexed<std::array<double, 4>> motor_speeds;
 
 			StateMachine state_machine;
@@ -74,27 +83,16 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 			rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx;
 			
+			rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
 			rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr stop_sub;
 			rclcpp::Client<nav2_msgs::srv::LoadMap>::SharedPtr load_map_client;
 			rclcpp::TimerBase::SharedPtr timer;
 
-			R2Node()
-				: rclcpp::Node("r2")
-				, goto_area_in {
-					Mutexed<GotoArea::In>::make(GotoArea::In {
-						Xyth::zero()
-						, (10ms).count()
-					})
-				}
-				, dancing_in {
-					Mutexed<Dancing::In>::make(Dancing::In {
-						get_system_timepoint(*this->get_clock())
-						, (10ms).count()
-					})
-				}
-				, motor_speeds {
-					Mutexed<std::array<double, 4>>::make(std::array<double, 4>{0.0, 0.0, 0.0, 0.0})
-				}
+			R2Node(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
+				: rclcpp::Node("r2", options)
+				, current_pose{Mutexed<Xyth>::make(Xyth::zero())}
+				, manual_speed{Mutexed<Xyth>::make(Xyth::zero())}
+				, motor_speeds{Mutexed<std::array<double, 4>>::make(std::array<double, 4>{0.0, 0.0, 0.0, 0.0})}
 				, state_machine(StateMachine::make(this->goto_area2()))
 				, thd([this](std::stop_token stoken) {
 					state_machine.run(stoken);
@@ -102,9 +100,12 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				, tf2_buffer{this->get_clock()}
 				, tf2_listener{tf2_buffer}
 				, can_tx{create_publisher<can_plugins2::msg::Frame>("can_tx", 10)}
-				, stop_sub(create_subscription<std_msgs::msg::Empty> (
-					"r2/stop",
-					1,
+				, joy_sub(create_subscription<sensor_msgs::msg::Joy>("joy", 1,
+					[this](const sensor_msgs::msg::Joy::SharedPtr joy) {
+						this->joy_callback(std::move(*joy));
+					}
+				))
+				, stop_sub(create_subscription<std_msgs::msg::Empty>("r2/stop", 1,
 					[this](const std_msgs::msg::Empty::SharedPtr) {
 						thd.request_stop();
 					}
@@ -112,46 +113,76 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				, load_map_client(create_client<nav2_msgs::srv::LoadMap>("nav2/load_map"))
 				, timer{}
 			{
-				for(const auto id : robot_config::ids) {
-					if(id.has_value()) {
-						can_tx->publish(command_frame(*id, Command::recover_velocity));
-						rclcpp::sleep_for(200ms);
-					}
-				}
-
 				timer = create_wall_timer(10ms, [this]() {
 					this->timer_callback();
 				});
 			}
 
-			static auto make() -> std::unique_ptr<R2Node> {
-				return std::make_unique<R2Node>();
+			void joy_callback(sensor_msgs::msg::Joy&& joy) {
+				if(joy.buttons[Buttons::back]) {
+					this->change_mode.set(Mode::manual);
+				}
+				else if(joy.buttons[Buttons::a]) {
+					this->change_mode.set(Mode::automatic);
+				}
+				manual_speed.set(Xyth::make (
+					Xy::make (
+						joy.axes[Axes::l_stick_LR] * robot_config::max_vxy / std::sqrt(2.0)
+						, joy.axes[Axes::l_stick_UD] * robot_config::max_vxy / std::sqrt(2.0)
+					)
+					, joy.axes[Axes::r_stick_LR] * robot_config::max_vth
+				));
 			}
 
 			void timer_callback() {
-				auto now = get_system_timepoint(*this->get_clock());
+				// input
 				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
-				this->goto_area_in.set(GotoArea::In {
-					current_pose ? *current_pose : this->goto_area_in.get().current_pose
-					, (10ms).count()
-				});
-				this->dancing_in.set(Dancing::In {
-					now
-					, (10ms).count()
-				});
+				if(current_pose.has_value()) {
+					this->current_pose.set(*current_pose);
+				}
 
-				const auto motor_speeds = this->motor_speeds.get();
-				printlns("r2_node: motor_speeds: ", motor_speeds);
+				// output
+				this->send_motor_speeds(this->motor_speeds.get());
+			}
+
+			void send_motor_speeds(const std::array<double, 4>& speeds) {
 				for(u32 i = 0; i < 4; ++i) {
-					if(robot_config::ids[i].has_value()) {
-						this->can_tx->publish(target_frame(*robot_config::ids[i], motor_speeds[i]));
-						rclcpp::sleep_for(200us);
+					if(const auto id = robot_config::ids[i]; id) {
+						this->can_tx->publish(target_frame(*id, speeds[i]));
 					}
 				}
 			}
 
-			auto goto_area2() -> std::unique_ptr<StateBase> {
-				auto path = path_load("path/to_area2.txt");
+			auto to_manual(std::unique_ptr<StateBase>&& next_state) -> std::unique_ptr<StateBase> {
+				auto state = make_state<TemporaryManual> (
+					TemporaryManual::Content::make()
+					, [this]() -> TemporaryManual::In {
+						rclcpp::sleep_for(10ms);
+						const auto current_pose = this->current_pose.get();
+
+						return TemporaryManual::In {
+							current_pose
+							, this->change_mode.get() == Mode::automatic
+						};
+					}
+					, [this](TemporaryManual::Out&& out) {
+						this->motor_speeds.set(out.motor_speeds);
+					}
+					, [this, next_state = std::move(next_state)](TemporaryManual::TransitArg&&) mutable -> std::unique_ptr<StateBase> {
+						return {std::move(next_state)};
+					}
+				);
+
+				return std::make_unique<decltype(state)>(std::move(state));
+			}
+
+			auto goto_area(const std::string_view pathfile, auto&& next_state, auto&& recover_manual) -> std::unique_ptr<StateBase>
+			requires requires {
+				{next_state()} -> std::same_as<std::unique_ptr<StateBase>>;
+				{recover_manual()} -> std::same_as<std::unique_ptr<StateBase>>;
+			}
+			{
+				auto path = path_load(pathfile);
 				if(path.has_value()) {
 					auto state = make_state<GotoArea> (
 						GotoArea::Content::make (
@@ -161,54 +192,36 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 						)
 						, [this]() -> GotoArea::In {
 							rclcpp::sleep_for(10ms);
-							return this->goto_area_in.get();
+							const auto current_pose = this->current_pose.get();
+							const auto change_to_manual = this->change_mode.get() == Mode::manual;
+
+							return GotoArea::In {
+								current_pose
+								, change_to_manual
+							};
 						}
 						, [this](GotoArea::Out&& out) {
 							this->motor_speeds.set(out.motor_speeds);
 						}
-						, [this](GotoArea::TransitArg&&) {
-							return this->goto_area3();
+						, [this, next_state = std::move(next_state), recover_manual = std::move(recover_manual)](GotoArea::TransitArg&& targ) mutable {
+							if(not targ.change_to_manual) return next_state();
+							else return this->to_manual(recover_manual());
 						}
 					);
 					return std::make_unique<decltype(state)>(std::move(state));
 				}
 				else {
 					RCLCPP_ERROR_STREAM(this->get_logger(), "r2_node: failed to load path: " << path.error());
-					return nullptr;
+					return this->to_manual(recover_manual());
 				}
 			}
 
-			auto goto_area3() -> std::unique_ptr<StateBase> {
-				nav2_msgs::srv::LoadMap::Request::SharedPtr request{};
-				request->map_url = "map/area2.yaml";
-				auto result = this->load_map_client->async_send_request(std::move(request));
-				result.wait_for(3s);
+			auto goto_area2() -> std::unique_ptr<StateBase> {
+				return this->goto_area("path/to_area2.txt", [this](){return this->goto_area3();}, [this]{return this->to_manual(this->goto_area2());});
+			}
 
-				auto path = path_load("path/to_area3.txt");
-				if(path.has_value()) {
-					auto state = make_state<GotoArea> (
-						GotoArea::Content::make (
-							std::move(*path)
-							, XyPid::make(1.0, 0.0, 0.0)
-							, ThPid::make(1.0, 0.0, 0.0)
-						)
-						, [this]() -> GotoArea::In {
-							rclcpp::sleep_for(10ms);
-							return this->goto_area_in.get();
-						}
-						, [this](GotoArea::Out&& out) {
-							this->motor_speeds.set(out.motor_speeds);
-						}
-						, [this](GotoArea::TransitArg&&) {
-							return this->dancing(1s, true);
-						}
-					);
-					return std::make_unique<decltype(state)>(std::move(state));
-				}
-				else {
-					RCLCPP_ERROR_STREAM(this->get_logger(), "r2_node: failed to load path: " << path.error());
-					return nullptr;
-				}
+			auto goto_area3() -> std::unique_ptr<StateBase> {
+				return this->goto_area("path/to_area3.txt", [this](){return this->dancing(2s, true);}, [this]{return this->to_manual(this->goto_area3());});
 			}
 
 			auto dancing(const std::chrono::seconds& duration, const bool left_turn) -> std::unique_ptr<StateBase> {
@@ -219,13 +232,18 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					)
 					, [this]() -> Dancing::In {
 						rclcpp::sleep_for(10ms);
-						return this->dancing_in.get();
+						const auto change_to_manual = this->change_mode.get() == Mode::manual;
+
+						return Dancing::In {
+							change_to_manual
+						};
 					}
 					, [this](Dancing::Out&& out) {
 						this->motor_speeds.set(out.motor_speeds);
 					}
-					, [this](Dancing::TransitArg&& targ) {
-						return this->dancing(targ.turn_duration + 1s, !targ.left_turn);
+					, [this, duration, left_turn](Dancing::TransitArg&& targ) {
+						if(targ.change_to_manual) return this->dancing(duration + 1s, !left_turn);
+						else return this->to_manual(this->dancing(duration, left_turn));
 					}
 				);
 

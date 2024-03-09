@@ -38,6 +38,7 @@ ament_target_dependencies(r2_node
   tf2_ros
   tf2_geometry_msgs
   nav2_msgs
+  sensor_msgs
   can_plugins2
 )
 
