@@ -20,6 +20,7 @@
 
 namespace nhk24_2nd_ws::r2::filter_node::impl {
 	using nhk24_2nd_ws::xyth::Xy;
+	using nhk24_2nd_ws::xyth::XyOp;
 	using nhk24_2nd_ws::xyth::Xyth;
 	using nhk24_2nd_ws::r2::ros2_utils::get_pose;
 	using nhk24_2nd_ws::r2::lidar_filter::LidarScan;
@@ -73,7 +74,7 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 				)
 				, BoxFilter::make (
 					*lidar_pose
-					, Xyth::make(area_half_diagonal, 0.0)
+					, Xyth::make(area_half_diagonal +XyOp{}+ Xy::make(0.050, 0.050), 0.0)
 					, area_half_diagonal
 				)
 				, ShadowFilter::make (
