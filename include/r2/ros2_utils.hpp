@@ -7,6 +7,7 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2_ros/buffer.h>
+#include <geometry_msgs/msg/pose.hpp>
 
 #include <include/xyth.hpp>
 
@@ -31,6 +32,16 @@ namespace nhk24_2nd_ws::r2::ros2_utils::impl {
 		}
 	}
 
+	inline auto xyth_to_pose_msg(const Xyth& xyth) -> geometry_msgs::msg::Pose {
+		geometry_msgs::msg::Pose pose{};
+		pose.position.x = xyth.xy.x;
+		pose.position.y = xyth.xy.y;
+		tf2::Quaternion q{};
+		q.setRPY(0, 0, xyth.th);
+		pose.orientation = MsgConvertor<tf2::Quaternion, geometry_msgs::msg::Quaternion>::toMsg(q);
+		return pose;
+	}
+
 	inline auto get_system_timepoint(rclcpp::Clock& clock) -> std::chrono::system_clock::time_point {
 		return std::chrono::system_clock::time_point{std::chrono::system_clock::duration{clock.now().nanoseconds()}};
 	}
@@ -38,5 +49,6 @@ namespace nhk24_2nd_ws::r2::ros2_utils::impl {
 
 namespace nhk24_2nd_ws::r2::ros2_utils {
 	using nhk24_2nd_ws::r2::ros2_utils::impl::get_pose;
+	using nhk24_2nd_ws::r2::ros2_utils::impl::xyth_to_pose_msg;
 	using nhk24_2nd_ws::r2::ros2_utils::impl::get_system_timepoint;
 }

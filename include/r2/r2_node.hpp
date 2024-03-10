@@ -15,14 +15,18 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/empty.hpp>
+#include <std_srvs/srv/empty.hpp>
 #include <nav2_msgs/srv/load_map.hpp>
 #include <sensor_msgs/msg/joy.hpp>
+#include <lifecycle_msgs/srv/change_state.hpp>
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 
 #include <tf2/LinearMath/Transform.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/exceptions.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
+#include <tf2_ros/transform_broadcaster.h>
 
 #include <can_plugins2/msg/frame.hpp>
 
@@ -56,6 +60,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using main::GoUpSlope;
 	using path_parser::path_load;
 	using ros2_utils::get_pose;
+	using ros2_utils::xyth_to_pose_msg;
 	using shirasu::target_frame;
 	using logicool::Axes;
 	using logicool::Buttons;
@@ -79,13 +84,18 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			StateMachine state_machine;
 			std::jthread thd;
 
+			tf2_ros::TransformBroadcaster tf2_broadcaster;
 			tf2_ros::Buffer tf2_buffer;
 			tf2_ros::TransformListener tf2_listener;
 
 			rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx;
+			rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_pub;
 			
 			rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
 			rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr stop_sub;
+
+			rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr map_server_change_state_client;
+			rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr amcl_change_state_client;
 			rclcpp::Client<nav2_msgs::srv::LoadMap>::SharedPtr load_map_client;
 			rclcpp::TimerBase::SharedPtr timer;
 
@@ -98,9 +108,11 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				, thd([this](std::stop_token stoken) {
 					state_machine.run(stoken);
 				})
+				, tf2_broadcaster{*this}
 				, tf2_buffer{this->get_clock()}
 				, tf2_listener{tf2_buffer}
 				, can_tx{create_publisher<can_plugins2::msg::Frame>("can_tx", 10)}
+				, initial_pose_pub{create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 1)}
 				, joy_sub(create_subscription<sensor_msgs::msg::Joy>("joy", 1,
 					[this](const sensor_msgs::msg::Joy::SharedPtr joy) {
 						this->joy_callback(std::move(*joy));
@@ -111,9 +123,42 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 						thd.request_stop();
 					}
 				))
-				, load_map_client(create_client<nav2_msgs::srv::LoadMap>("nav2/load_map"))
+				, map_server_change_state_client(create_client<lifecycle_msgs::srv::ChangeState>("map_server/change_state"))
+				, amcl_change_state_client(create_client<lifecycle_msgs::srv::ChangeState>("amcl/change_state"))
+				, load_map_client(create_client<nav2_msgs::srv::LoadMap>("map_server/load_map"))
 				, timer{}
 			{
+				// ここ順番が大事。
+				// どいつがどのライフサイクルか、どのライフサイクルでどのクエリが投げられるかを考えること
+				{
+					this->map_server_change_state_client->wait_for_service();
+					auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+					req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
+					this->map_server_change_state_client->async_send_request(std::move(req)).get();
+					auto req2 = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+					req2->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+					this->map_server_change_state_client->async_send_request(std::move(req2)).get();
+				}
+				{
+					this->amcl_change_state_client->wait_for_service();
+					auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+					req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
+					this->amcl_change_state_client->async_send_request(std::move(req)).get();
+					
+					auto nomotion_update_client = this->create_client<std_srvs::srv::Empty>("request_nomotion_update");
+					nomotion_update_client->wait_for_service();
+					nomotion_update_client->async_send_request (
+						std::make_shared<std_srvs::srv::Empty::Request>()
+					).get();
+					
+					auto req2 = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+					req2->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+					this->amcl_change_state_client->async_send_request(std::move(req2)).get();
+				}
+				{
+					this->load_map_client->wait_for_service();
+				}
+
 				this->timer = this->create_wall_timer(10ms, [this]() {
 					this->timer_callback();
 				});
@@ -136,7 +181,6 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 
 			void timer_callback() {
-				// printlns("r2_node: timer_callback");
 				// input
 				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
 				if(current_pose.has_value()) {
@@ -190,8 +234,49 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				{recover_manual()} -> std::same_as<std::unique_ptr<StateBase>>;
 			}
 			{
+
 				auto path = path_load(pathfile);
 				if(path.has_value()) {
+
+					/// @todo AMCLをDeactivate -> AMCLに初期位置をセット、TF2からfilter_nodeなどに初期位置を教える、Map更新 -> AMCLをActivate
+					{
+						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
+						amcl_change_state_client->async_send_request(std::move(req))
+							.get();
+					}
+					auto initial_pose = xyth_to_pose_msg(path->front());
+					{
+						geometry_msgs::msg::PoseWithCovarianceStamped msg{};
+						msg.header.frame_id = "map";
+						msg.pose.pose = initial_pose;
+						msg.pose.covariance[0] = 1.0;  // 1.0 ^ 2
+						msg.pose.covariance[7] = 1.0;  // 1.0 ^ 2
+						msg.pose.covariance[35] = 0.25;  // だいたい(3.14 * 2 / 12)^2
+						initial_pose_pub->publish(std::move(msg));
+					}
+					{
+						geometry_msgs::msg::TransformStamped transform_stamped{};
+						transform_stamped.header.stamp = this->now();
+						transform_stamped.header.frame_id = "map";
+						transform_stamped.child_frame_id = "base_link";
+						transform_stamped.transform.translation.x = initial_pose.position.x;
+						transform_stamped.transform.translation.y = initial_pose.position.y;
+						transform_stamped.transform.translation.z = 0.0;
+						transform_stamped.transform.rotation = initial_pose.orientation;
+						tf2_broadcaster.sendTransform(std::move(transform_stamped));
+					}
+					{
+						auto req = std::make_shared<nav2_msgs::srv::LoadMap::Request>();
+						req->map_url = std::string{pathfile};
+						load_map_client->async_send_request(std::move(req)).get();
+					}
+					{
+						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+						amcl_change_state_client->async_send_request(std::move(req)).get();
+					}
+
 					auto state = make_state<GotoArea> (
 						GotoArea::Content::make (
 							std::move(*path)
@@ -212,8 +297,12 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 							this->motor_speeds.set(out.motor_speeds);
 						}
 						, [this, next_state = std::move(next_state), recover_manual = std::move(recover_manual)](GotoArea::TransitArg&& targ) mutable {
-							if(not targ.change_to_manual) return next_state();
-							else return this->to_manual(recover_manual());
+							if(not targ.change_to_manual) {
+								return next_state();
+							}
+							else {
+								return this->to_manual(recover_manual());
+							}
 						}
 					);
 					return std::make_unique<decltype(state)>(std::move(state));
@@ -232,7 +321,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					);
 				}
 				, [this] {
-					return this->to_manual(this->goto_area2());
+					return this->goto_area2();
 				});
 			}
 
@@ -244,7 +333,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					);
 				}
 				, [this] {
-					return this->to_manual(this->goto_area3());
+					return this->goto_area3();
 				});
 			}
 
@@ -254,6 +343,12 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				{recover_manual()} -> std::same_as<std::unique_ptr<StateBase>>;
 			}
 			{
+				auto seisyukuni = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+				seisyukuni->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
+				this->amcl_change_state_client->async_send_request (
+					std::move(seisyukuni)
+				).get();
+
 				auto state = make_state<GoUpSlope> (
 					GoUpSlope::Content::make()
 					, [this]() -> GoUpSlope::In {
@@ -268,8 +363,12 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 						this->motor_speeds.set(out.motor_speeds);
 					}
 					, [this, next_state = std::move(next_state), recover_manual = std::move(recover_manual)](GoUpSlope::TransitArg&& targ) mutable {
-						if(not targ.change_to_manual) return next_state();
-						else return this->to_manual(recover_manual());
+						if(not targ.change_to_manual) {
+							return next_state();
+						}
+						else {
+							return this->to_manual(recover_manual());
+						}
 					}
 				);
 
