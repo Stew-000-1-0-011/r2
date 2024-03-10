@@ -144,7 +144,12 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				}
 
 				// output
+				printlns(this->motor_speeds.get());
 				this->send_motor_speeds(this->motor_speeds.get());
+
+				// debug
+				const auto manual_speed = this->manual_speed.get();
+				printlns(manual_speed.xy.x, manual_speed.xy.y, manual_speed.th);
 			}
 
 			void send_motor_speeds(const std::array<double, 4>& speeds) {
@@ -160,14 +165,15 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					TemporaryManual::Content::make()
 					, [this]() -> TemporaryManual::In {
 						rclcpp::sleep_for(10ms);
-						const auto current_pose = this->current_pose.get();
+						const auto manual_speed = this->manual_speed.get();
 
 						return TemporaryManual::In {
-							current_pose
+							manual_speed
 							, this->change_mode.get() == Mode::automatic
 						};
 					}
 					, [this](TemporaryManual::Out&& out) {
+						printlns("motor_speeds in output: ", out.motor_speeds);
 						this->motor_speeds.set(out.motor_speeds);
 					}
 					, [this, next_state = std::move(next_state)](TemporaryManual::TransitArg&&) mutable -> std::unique_ptr<StateBase> {
