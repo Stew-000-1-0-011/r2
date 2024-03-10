@@ -16,7 +16,7 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 
 	inline constexpr auto ids = std::array<std::optional<u32>, 4> {
 		std::make_optional(0x160)
-		, std::make_optional(0x144)
+		, std::make_optional(0x164)
 		, std::make_optional(0x110)
 		, std::make_optional(0x154)
 	};
