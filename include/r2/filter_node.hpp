@@ -34,6 +34,8 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 	using nhk24_2nd_ws::r2::robot_config::shadow_window;
 
 	struct FilterNode final : rclcpp::Node {
+		sensor_msgs::msg::LaserScan last_msgs{};
+
 		tf2_ros::Buffer tf_buffer;
 		tf2_ros::TransformListener tf_listener;
 
