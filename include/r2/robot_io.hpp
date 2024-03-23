@@ -90,7 +90,7 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 		Mutexed<Xyth> manual_speed;
 		Mutexed<std::optional<StateName::Enum>> manual_recover_state;
 		Wanko<ManualAuto> change_manual_auto;
-		Wanko<Void> kill_interrupt;
+		std::atomic_flag kill_interrupt;
 
 		Mutexed<Xyth> body_speed;
 
@@ -101,7 +101,7 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 			, manual_speed(Mutexed<Xyth>::make(Xyth::zero()))
 			, manual_recover_state(Mutexed<std::optional<StateName::Enum>>::make(std::nullopt))
 			, change_manual_auto(Wanko<ManualAuto>::make())
-			, kill_interrupt(Wanko<Void>::make())
+			, kill_interrupt(ATOMIC_FLAG_INIT)
 			, body_speed(Mutexed<Xyth>::make(Xyth::zero()))
 			, change_map(nullptr)
 		{}
@@ -111,7 +111,22 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 		}
 
 		auto kill_interrupted() -> bool {
-			return !!this->kill_interrupt.get();
+			return this->kill_interrupt.test();
+		}
+
+		template<class F_>
+		requires requires (F_ f) {
+			{[]<class T_>(const std::optional<T_>&){}(f())};
+		}
+		auto busy_loop(F_&& f) -> std::optional<std::decay_t<decltype(*f())>> {
+			using Ret = std::optional<std::decay_t<decltype(*f())>>;
+			
+			while(!this->kill_interrupted()) {
+				if(auto ret = f()) {
+					return Ret{std::in_place, std::move(*ret)};
+				}
+			}
+			return Ret{std::nullopt};
 		}
 	};
 }

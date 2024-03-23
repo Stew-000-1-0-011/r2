@@ -1,26 +1,19 @@
-// #include <iostream>
+#include <my_include/debug_print.hpp>
 
-// #include <my_include/debug_print.hpp>
-// #include <r2/path_parser.hpp>
-
-// using nhk24_2nd_ws::debug_print::printlns;
-// using nhk24_2nd_ws::r2::path_parser::path_load;
-// using nhk24_2nd_ws::r2::path_parser::impl::load_file;
-// using nhk24_2nd_ws::r2::path_parser::impl::path;
-// using nhk24_2nd_ws::r2::path_parser::impl::milestone;
-
-// int main() {
-// 	auto res = path_load("path/to_area2.txt");
-// 	if(res) {
-// 		for(const auto& xyth : *res) {
-// 			std::cout << xyth.xy.x << " " << xyth.xy.y << " " << xyth.th << std::endl;
-// 		}
-// 	} else {
-// 		std::cerr << "failed." << std::endl;
-// 	}
-// }
-
-#include <r2/temporary_manual.hpp>
+using nhk24_2nd_ws::debug_print::printlns;
 
 int main() {
+	//printlns test
+	
+	printlns("Hello, World!", 42, 3.14);
+	printlns(std::string_view{"Hello, World!"});
+	printlns(std::string{"Hello, World!"});
+	printlns(std::string{"Hello, World!"}.c_str());
+	printlns(std::vector<int>{1, 2, 3});
+	printlns(std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}});
+	printlns(std::variant<int, double>{42});
+	printlns(std::variant<int, double>{3.14});
+	printlns(std::variant<std::monostate, int, double>{});
+	printlns(std::optional<int>{});
+	printlns(std::optional<int>{42});
 }

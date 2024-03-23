@@ -10,6 +10,10 @@
 #include <utility>
 #include <chrono>
 #include <tuple>
+#include <future>
+#include <array>
+#include <thread>
+#include <optional>
 #include <memory>
 #include <string_view>
 
@@ -59,7 +63,6 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	namespace {
 		struct R2Node final : rclcpp::Node {
 			Io * io;
-			const volatile std::atomic_flag * kill_interrupt;
 			Omni4 omni4;
 
 			tf2_ros::TransformBroadcaster tf2_broadcaster;
@@ -80,12 +83,10 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 			R2Node (
 				Io *const io
-				, const volatile std::atomic_flag *const kill_interrupt
 				, const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
 			)
 				: rclcpp::Node("r2", options)
 				, io{io}
-				, kill_interrupt{kill_interrupt}
 				, omni4{Omni4::make()}
 				, tf2_broadcaster{*this}
 				, tf2_buffer{this->get_clock()}
@@ -104,7 +105,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 							this->io->manual_recover_state.set(std::move(received));
 						}
 						else {
-							printlns("invalid manual_recover_state: ", msg->data);
+							// printlns("invalid manual_recover_state: ", msg->data);
 						}
 					}
 				))
@@ -144,20 +145,12 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 
 			void timer_callback() {
-				// check kill_interrupt
-				if(this->kill_interrupt->test()) {
-					this->io->change_manual_auto.set(ManualAuto::manual);
-					this->io->manual_speed.set(Xyth::make(Xy::make(0.0, 0.0), 0.0));
-					this->io->kill_interrupt.set(Void{});
-					rclcpp::shutdown();
-					return;
-				}
-
 				// input
 				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
 				if(current_pose.has_value()) {
 					this->io->current_pose.set(*current_pose);
 				}
+				// printlns("current_pose: ", this->io->current_pose.get());
 
 				// output
 				const auto body_speed = this->io->body_speed.get();
@@ -165,10 +158,10 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				this->send_motor_speeds(motor_speeeds);
 
 				// debug
-				printlns("body_speed: ", body_speed);
-				printlns("motor_speeeds: ", motor_speeeds);
+				// printlns("body_speed: ", body_speed);
+				// printlns("motor_speeeds: ", motor_speeeds);
 				const auto manual_speed = this->io->manual_speed.get();
-				printlns("manual_speed: ", manual_speed);
+				// printlns("manual_speed: ", manual_speed);
 			}
 
 			void send_motor_speeds(const std::array<double, 4>& speeds) {
@@ -179,29 +172,37 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				}
 			}
 
-			void wait_for_service() const {
-				this->map_server_change_state_client->wait_for_service();
-				this->amcl_change_state_client->wait_for_service();
-				this->load_map_client->wait_for_service();
-			}
-
 			void change_map(const MapName::Enum filepath, const Xyth& initial_pose) {
-				// disable amcl
 				{
-					auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-					req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
-					this->amcl_change_state_client->async_send_request(std::move(req)).get();
+					io->busy_loop([this]() -> std::optional<Void> {
+						// amclを非アクティブ状態にする
+						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
+						if(this->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
+
+					printlns("amcl is deactivated.");
 				}
 				
-				// change map
 				{
-					auto req = std::make_shared<nav2_msgs::srv::LoadMap::Request>();
-					req->map_url = std::string{"map/"} + std::string(MapName::to_filepath(filepath)) + ".yaml";
-					this->load_map_client->async_send_request(std::move(req)).get();
+					io->busy_loop([this, filepath]() -> std::optional<Void> {
+						// map_serverに地図をロードさせる
+						auto req = std::make_shared<nav2_msgs::srv::LoadMap::Request>();
+						req->map_url = std::string{"map/"} + std::string(MapName::to_filepath(filepath)) + ".yaml";
+						if(this->load_map_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
+
+					printlns("map is loaded.");
 				}
 
-				// set initialpose
 				{
+					// 初期位置を設定
 					auto initial_pose_msg = geometry_msgs::msg::PoseWithCovarianceStamped();
 					initial_pose_msg.header.frame_id = "map";
 					initial_pose_msg.pose.pose.position.x = initial_pose.xy.x;
@@ -209,62 +210,118 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					initial_pose_msg.pose.pose.orientation.z = std::sin(initial_pose.th / 2);  // ここら辺ほんとにあってるか不安(copilotくんはこう出してる)
 					initial_pose_msg.pose.pose.orientation.w = std::cos(initial_pose.th / 2);
 					this->initial_pose_pub->publish(initial_pose_msg);
+
+					printlns("initial_pose is set.");
 				}
 
-				// enable amcl
 				{
-					auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-					req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
-					this->amcl_change_state_client->async_send_request(std::move(req)).get();
+					io->busy_loop([this]() -> std::optional<Void> {
+						// amclをアクティブ状態にする
+						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+						if(this->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
+
+					printlns("amcl is activated.");
 				}
+			}
+
+			void kill() {
+				this->io->kill_interrupt.test_and_set();
+				rclcpp::sleep_for(100ms);
+				this->send_motor_speeds({0.0, 0.0, 0.0, 0.0});
+				rclcpp::sleep_for(100ms);
 			}
 		};
 
 		inline auto make_node (
-			const volatile std::atomic_flag *const kill_interrupt
-			, const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
-		) -> std::tuple<std::shared_ptr<R2Node>, std::future<std::unique_ptr<Io>>> {
+			const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
+		) -> std::tuple<std::shared_ptr<R2Node>, std::future<std::optional<std::unique_ptr<Io>>>> {
 			auto io = Io::make_unique();
-			auto node = std::make_shared<R2Node>(io.get(), kill_interrupt, options);
-			auto fut = std::async(std::launch::async, [io = std::move(io), node = node]() mutable -> std::unique_ptr<Io> {
+			auto node = std::make_shared<R2Node>(io.get(), options);
+			auto fut = std::async(std::launch::async, [io = std::move(io), node = node]() mutable -> std::optional<std::unique_ptr<Io>> {
 				// ここ順番が大事。
 				// どいつがどのライフサイクルか、どのライフサイクルでどのクエリが投げられるかを考えること
 				{
-					// map_serverの準備ができるまで待つ
-					node->map_server_change_state_client->wait_for_service();
+					io->busy_loop([node]() -> std::optional<Void> {
+						// map_server_change_state_clientを使えるようにする
+						if(node->map_server_change_state_client->wait_for_service(100ms)) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
 
-					// map_serverをコンフィグレーション状態にする
-					auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-					req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
-					node->map_server_change_state_client->async_send_request(std::move(req)).get();
+					io->busy_loop([node]() -> std::optional<Void> {
+						// map_serverをコンフィグレーション状態にする
+						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
+						if(node->map_server_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
 
-					// map_serverをアクティブ状態にする
-					auto req2 = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-					req2->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
-					node->map_server_change_state_client->async_send_request(std::move(req2)).get();
+					io->busy_loop([node]() -> std::optional<Void> {
+						// map_serverをアクティブ状態にする
+						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+						if(node->map_server_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
+
+					printlns("map_server is ready.");
 				}
 				{
-					// amclの準備ができるまで待つ
-					node->amcl_change_state_client->wait_for_service();
+					io->busy_loop([node]() -> std::optional<Void> {
+						// amcl_change_state_clientを使えるようにする
+						if(node->amcl_change_state_client->wait_for_service(100ms)) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
 
-					// amclをコンフィグレーション状態にする
-					auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-					req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
-					node->amcl_change_state_client->async_send_request(std::move(req)).get();
-					
-					// amclをアクティブ状態にする
-					auto req2 = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-					req2->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
-					node->amcl_change_state_client->async_send_request(std::move(req2)).get();
+					io->busy_loop([node]() -> std::optional<Void> {
+						// amclをコンフィグレーション状態にする
+						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
+						if(node->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
+
+					io->busy_loop([node]() -> std::optional<Void> {
+						// amclをアクティブ状態にする
+						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+						if(node->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
+
+					printlns("amcl is ready.");
 				}
 				{
-					// map_serverのload_mapの準備ができるまで待つ
-					node->load_map_client->wait_for_service();
+					io->busy_loop([node]() -> std::optional<Void> {
+						// load_map_clientを使えるようにする
+						if(node->load_map_client->wait_for_service(100ms)) {
+							return Void{};
+						}
+						return std::nullopt;
+					});
+
+					printlns("load_map is ready.");
 				}
-				/// @todo change_mapをここで呼び、map_serverにyaml渡したりamclのyamlに初期位置書くのをやめられるならやめるべきかも
-				// {
-				// 	node->change_map(MapName::area1, /* todo */);
-				// }
+				{
+					// 地図と初期位置を設定
+					node->change_map(MapName::area1, robot_config::area1_initialpose);
+				}
 
 				return std::move(io);
 			});

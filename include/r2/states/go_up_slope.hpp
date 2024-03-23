@@ -17,8 +17,8 @@ namespace nhk24_2nd_ws::r2::go_up_slope::impl {
 	using state_machine::make_non_loop_state;
 	using robot_config::go_up_slope_speed;
 	using robot_config::go_up_slope_duration;
-	using robot_config::area2_initialpose;
-	using robot_config::area3_initialpose;
+	using robot_config::area2_from_slop_initialpose;
+	using robot_config::area3_from_slop_initialpose;
 	using robot_io::Io;
 	using robot_io::MapName;
 	using transit_state::StateBase;
@@ -48,11 +48,11 @@ namespace nhk24_2nd_ws::r2::go_up_slope::impl {
 namespace nhk24_2nd_ws::r2::transit_state {
 	inline auto to_slope_1to2() -> std::unique_ptr<StateBase> {
 		using namespace go_up_slope::impl;
-		return to_go_up_slope(MapName::area2, area2_initialpose, to_pass_area2);
+		return to_go_up_slope(MapName::area2, area2_from_slop_initialpose, to_pass_area2);
 	}
 
 	inline auto to_slope_2to3() -> std::unique_ptr<StateBase> {
 		using namespace go_up_slope::impl;
-		return to_go_up_slope(MapName::area3_yellow, area3_initialpose, to_dancing);
+		return to_go_up_slope(MapName::area3_yellow, area3_from_slop_initialpose, to_dancing);
 	}
 }

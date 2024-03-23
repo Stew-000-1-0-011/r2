@@ -1,8 +1,7 @@
-#include <csignal>
-#include <atomic>
 #include <memory>
 #include <thread>
 #include <utility>
+#include <syncstream>
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -15,6 +14,7 @@
 #include <r2/manual_stop_node.hpp>
 
 using nhk24_2nd_ws::debug_print::printlns;
+using nhk24_2nd_ws::debug_print::PinCOut;
 using nhk24_2nd_ws::state_machine::StateMachine;
 using nhk24_2nd_ws::r2::robot_io::Io;
 using nhk24_2nd_ws::r2::r2_node::R2Node;
@@ -23,17 +23,15 @@ using nhk24_2nd_ws::r2::r2_node::make_node;
 namespace transit_state = nhk24_2nd_ws::r2::transit_state;
 using nhk24_2nd_ws::r2::manual_stop_node::ManualStopNode;
 
-volatile std::atomic_flag kill_interrupt = ATOMIC_FLAG_INIT;
-
 int main(int argc, char *argv[]) {
 	rclcpp::init(argc, argv);
 
-	std::signal(SIGINT, [](int) -> void {
-		kill_interrupt.test_and_set();
-	});
-
 	auto manual_stop_node = std::make_shared<ManualStopNode>();
-	auto [node, io_fut] = make_node(&kill_interrupt);
+	auto [node, io_fut] = make_node();
+
+	rclcpp::on_shutdown([node] {
+		node->kill();
+	});
 
 	rclcpp::executors::MultiThreadedExecutor executor{};
 	executor.add_node(manual_stop_node);
@@ -45,7 +43,7 @@ int main(int argc, char *argv[]) {
 			transit_state::to_pass_area1()
 		);
 		auto io = io_fut.get();
-		machine.run(*io);
+		if(io) machine.run(**io);
 		printlns("state_machine_thread end.");
 	});
 
@@ -53,4 +51,5 @@ int main(int argc, char *argv[]) {
 	executor.spin();
 
 	printlns("r2_node end.");
+	printlns("kill_interrupted: ", node->io->kill_interrupted());
 }

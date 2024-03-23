@@ -91,7 +91,7 @@ namespace nhk24_2nd_ws::r2::transit_state {
 
 		auto path = PathName::load_path(PathName::start_to_area2);
 		if(!path.has_value()) {
-			return to_error_state("Failed to load path");
+			return to_error_state(std::string("Failed to load path: ") + path.error());
 		}
 		else {
 			return to_pass_area(
@@ -106,7 +106,7 @@ namespace nhk24_2nd_ws::r2::transit_state {
 
 		auto path = PathName::load_path(PathName::area2_to_area3);
 		if(!path.has_value()) {
-			return to_error_state("Failed to load path");
+			return to_error_state(std::string("Failed to load path: ") + path.error());
 		}
 		else {
 			return to_pass_area(
