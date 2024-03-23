@@ -24,7 +24,6 @@ namespace transit_state = nhk24_2nd_ws::r2::transit_state;
 using nhk24_2nd_ws::r2::manual_stop_node::ManualStopNode;
 
 volatile std::atomic_flag kill_interrupt = ATOMIC_FLAG_INIT;
-volatile std::atomic_flag user_defined_interrupt_done = ATOMIC_FLAG_INIT;
 
 int main(int argc, char *argv[]) {
 	rclcpp::init(argc, argv);
@@ -34,7 +33,7 @@ int main(int argc, char *argv[]) {
 	});
 
 	auto manual_stop_node = std::make_shared<ManualStopNode>();
-	auto [node, io_fut] = make_node(&kill_interrupt, &user_defined_interrupt_done);
+	auto [node, io_fut] = make_node(&kill_interrupt);
 
 	rclcpp::executors::MultiThreadedExecutor executor{};
 	executor.add_node(manual_stop_node);

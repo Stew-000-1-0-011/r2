@@ -60,7 +60,6 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 		struct R2Node final : rclcpp::Node {
 			Io * io;
 			const volatile std::atomic_flag * kill_interrupt;
-			const volatile std::atomic_flag * user_defined_interrupt_done;
 			Omni4 omni4;
 
 			tf2_ros::TransformBroadcaster tf2_broadcaster;
@@ -82,13 +81,11 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			R2Node (
 				Io *const io
 				, const volatile std::atomic_flag *const kill_interrupt
-				, const volatile std::atomic_flag *const user_defined_interrupt_done
 				, const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
 			)
 				: rclcpp::Node("r2", options)
 				, io{io}
 				, kill_interrupt{kill_interrupt}
-				, user_defined_interrupt_done{user_defined_interrupt_done}
 				, omni4{Omni4::make()}
 				, tf2_broadcaster{*this}
 				, tf2_buffer{this->get_clock()}
@@ -225,11 +222,10 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 		inline auto make_node (
 			const volatile std::atomic_flag *const kill_interrupt
-			, const volatile std::atomic_flag *const user_defined_interrupt_done
 			, const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
 		) -> std::tuple<std::shared_ptr<R2Node>, std::future<std::unique_ptr<Io>>> {
 			auto io = Io::make_unique();
-			auto node = std::make_shared<R2Node>(io.get(), kill_interrupt, user_defined_interrupt_done, options);
+			auto node = std::make_shared<R2Node>(io.get(), kill_interrupt, options);
 			auto fut = std::async(std::launch::async, [io = std::move(io), node = node]() mutable -> std::unique_ptr<Io> {
 				// ここ順番が大事。
 				// どいつがどのライフサイクルか、どのライフサイクルでどのクエリが投げられるかを考えること
