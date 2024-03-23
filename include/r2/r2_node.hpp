@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cmath>
+#include <atomic>
 #include <utility>
 #include <chrono>
 #include <tuple>
@@ -26,6 +27,7 @@
 #include <lifecycle_msgs/srv/change_state.hpp>
 #include <nav2_msgs/srv/load_map.hpp>
 
+#include <my_include/void.hpp>
 #include <my_include/xyth.hpp>
 #include <my_include/debug_print.hpp>
 
@@ -39,6 +41,7 @@
 namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using namespace std::chrono_literals;
 
+	using void_::Void;
 	using xyth::Xy;
 	using xyth::Xyth;
 	using debug_print::printlns;
@@ -56,6 +59,8 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	namespace {
 		struct R2Node final : rclcpp::Node {
 			Io * io;
+			const volatile std::atomic_flag * kill_interrupt;
+			const volatile std::atomic_flag * user_defined_interrupt_done;
 			Omni4 omni4;
 
 			tf2_ros::TransformBroadcaster tf2_broadcaster;
@@ -74,9 +79,16 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			rclcpp::Client<nav2_msgs::srv::LoadMap>::SharedPtr load_map_client;
 			rclcpp::TimerBase::SharedPtr timer;
 
-			R2Node(Io *const io, const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
+			R2Node (
+				Io *const io
+				, const volatile std::atomic_flag *const kill_interrupt
+				, const volatile std::atomic_flag *const user_defined_interrupt_done
+				, const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
+			)
 				: rclcpp::Node("r2", options)
 				, io{io}
+				, kill_interrupt{kill_interrupt}
+				, user_defined_interrupt_done{user_defined_interrupt_done}
 				, omni4{Omni4::make()}
 				, tf2_broadcaster{*this}
 				, tf2_buffer{this->get_clock()}
@@ -135,6 +147,15 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 
 			void timer_callback() {
+				// check kill_interrupt
+				if(this->kill_interrupt->test()) {
+					this->io->change_manual_auto.set(ManualAuto::manual);
+					this->io->manual_speed.set(Xyth::make(Xy::make(0.0, 0.0), 0.0));
+					this->io->kill_interrupt.set(Void{});
+					rclcpp::shutdown();
+					return;
+				}
+
 				// input
 				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
 				if(current_pose.has_value()) {
@@ -202,9 +223,13 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 		};
 
-		inline auto make_node(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) -> std::tuple<std::shared_ptr<R2Node>, std::future<std::unique_ptr<Io>>> {
+		inline auto make_node (
+			const volatile std::atomic_flag *const kill_interrupt
+			, const volatile std::atomic_flag *const user_defined_interrupt_done
+			, const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
+		) -> std::tuple<std::shared_ptr<R2Node>, std::future<std::unique_ptr<Io>>> {
 			auto io = Io::make_unique();
-			auto node = std::make_shared<R2Node>(io.get(), options);
+			auto node = std::make_shared<R2Node>(io.get(), kill_interrupt, user_defined_interrupt_done, options);
 			auto fut = std::async(std::launch::async, [io = std::move(io), node = node]() mutable -> std::unique_ptr<Io> {
 				// ここ順番が大事。
 				// どいつがどのライフサイクルか、どのライフサイクルでどのクエリが投げられるかを考えること
