@@ -10,10 +10,11 @@
 #include <numbers>
 #include <array>
 
-#include <include/std_types.hpp>
-#include <include/xyth.hpp>
+#include <my_include/std_types.hpp>
+#include <my_include/xyth.hpp>
 
 #include "robot_config.hpp"
+#include "lap_timer.hpp"
 
 namespace nhk24_2nd_ws::r2::omni4::impl {
 	using xyth::Xy;
@@ -28,6 +29,7 @@ namespace nhk24_2nd_ws::r2::omni4::impl {
 	using robot_config::center_to_wheel;
 	using robot_config::wheel_radius;
 	using robot_config::wheel_to_motor_ratio;
+	using lap_timer::LapTimer;
 
 	/**
 	 * @brief 速度上限や加速度上限を考慮して、モーターの速度を制限する
@@ -107,6 +109,7 @@ namespace nhk24_2nd_ws::r2::omni4::impl {
 	namespace {
 		struct Omni4 final {
 			private:
+			LapTimer dt_timer{};
 			BodySpeedFixer body_velocity_fixer{};
 			std::array<MotorSpeedFixer, 4> motor_velocity_fixers{};
 
@@ -122,7 +125,8 @@ namespace nhk24_2nd_ws::r2::omni4::impl {
 			 * @param dt 
 			 * @return std::array<double, 4> 
 			 */
-			auto update(const Xyth& body_velocity, const double dt) -> std::array<double, 4> {
+			auto update(const Xyth& body_velocity) -> std::array<double, 4> {
+				const auto dt = dt_timer.update().count();
 				constexpr auto op = XyOp{};
 				const auto fixed_body_velocity = body_velocity_fixer.update(body_velocity, dt);
 

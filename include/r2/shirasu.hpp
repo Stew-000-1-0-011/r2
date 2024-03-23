@@ -5,7 +5,7 @@
 
 #include <can_plugins2/msg/frame.hpp>
 
-#include <include/std_types.hpp>
+#include <my_include/std_types.hpp>
 
 namespace nhk24_2nd_ws::r2::shirasu::impl {
 	enum class Command : u8 {

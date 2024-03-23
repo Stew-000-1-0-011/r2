@@ -1,9 +1,14 @@
 #pragma once
 
-#include <include/parser_combinator.hpp>
-#include <include/basic_parser.hpp>
-#include <include/xyth.hpp>
-#include <include/file_loader.hpp>
+#include <vector>
+#include <string_view>
+#include <string>
+#include <expected>
+
+#include <my_include/parser_combinator.hpp>
+#include <my_include/basic_parser.hpp>
+#include <my_include/xyth.hpp>
+#include <my_include/file_loader.hpp>
 
 namespace nhk24_2nd_ws::r2::path_parser::impl {
 	using namespace parser_combinator::ops;
@@ -42,8 +47,29 @@ namespace nhk24_2nd_ws::r2::path_parser::impl {
 			}
 		});
 	}
+
+	struct PathName final {
+		enum class Enum : u8 {
+			start_to_area2
+			, area2_to_area3
+		};
+
+		using Enum::start_to_area2;
+		using Enum::area2_to_area3;
+
+		static auto load_path(const Enum path_name) -> std::expected<std::vector<Xyth>, std::string> {
+			std::string_view path_file{};
+			switch(path_name) {
+				case start_to_area2: path_file = "start_to_area2"; break;
+				case area2_to_area3: path_file = "area2_to_area3"; break;
+				default: path_file = "unreachable";
+			}
+
+			return path_load(std::string{"path/"}.append(path_file).append(".txt"));
+		}
+	};
 }
 
 namespace nhk24_2nd_ws::r2::path_parser {
-	using impl::path_load;
+	using impl::PathName;
 }

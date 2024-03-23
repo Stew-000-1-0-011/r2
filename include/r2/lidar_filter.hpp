@@ -8,8 +8,8 @@
 #include <ranges>
 #include <type_traits>
 
-#include <include/std_types.hpp>
-#include <include/xyth.hpp>
+#include <my_include/std_types.hpp>
+#include <my_include/xyth.hpp>
 
 namespace nhk24_2nd_ws::r2::lidar_filter::impl {
 	using nhk24_2nd_ws::xyth::Xy;

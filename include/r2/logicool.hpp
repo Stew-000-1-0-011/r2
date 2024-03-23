@@ -1,6 +1,6 @@
 #pragma once
 
-#include <include/std_types.hpp>
+#include <my_include/std_types.hpp>
 
 namespace nhk24_2nd_ws::r2::logicool {
 	struct Axes final {

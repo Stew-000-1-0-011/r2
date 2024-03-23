@@ -7,12 +7,15 @@
 
 #include <array>
 #include <optional>
+#include <chrono>
 
-#include <include/std_types.hpp>
-#include <include/xyth.hpp>
+#include <my_include/std_types.hpp>
+#include <my_include/xyth.hpp>
 
 namespace nhk24_2nd_ws::r2::robot_config::impl {
+	using namespace std::chrono_literals;
 	using nhk24_2nd_ws::xyth::Xy;
+	using nhk24_2nd_ws::xyth::Xyth;
 
 	inline constexpr auto ids = std::array<std::optional<u32>, 4> {
 		std::make_optional(0x160)
@@ -37,22 +40,31 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 
 	inline constexpr double shadow_filter_threshold_angle = 0.100;  // シャドウフィルタの閾値[rad]
 	inline constexpr u16 shadow_window = 10;  // シャドウフィルタの窓幅
+
+	inline constexpr Xyth go_up_slope_speed = Xyth::make(Xy::make(0.0, 1.0), 0.0);  // 坂道を登るときの速度
+	inline constexpr std::chrono::duration<double> go_up_slope_duration = 5.0s;  // 坂道を登るときの時間
+	inline constexpr Xyth area2_initialpose = Xyth::make(Xy::make(5.425, 0.400), 0.0);  // エリア2の初期位置
+	inline constexpr Xyth area3_initialpose = Xyth::make(Xy::make(1.425, 0.400), 0.0);  // エリア3の初期位置
 }
 
 namespace nhk24_2nd_ws::r2::robot_config {
-	using nhk24_2nd_ws::r2::robot_config::impl::ids;
-	using nhk24_2nd_ws::r2::robot_config::impl::footprint_half_diagonal;
-	using nhk24_2nd_ws::r2::robot_config::impl::max_v;
-	using nhk24_2nd_ws::r2::robot_config::impl::max_a;
-	using nhk24_2nd_ws::r2::robot_config::impl::max_vxy;
-	using nhk24_2nd_ws::r2::robot_config::impl::max_vth;
-	using nhk24_2nd_ws::r2::robot_config::impl::max_axy;
-	using nhk24_2nd_ws::r2::robot_config::impl::max_ath;
-	using nhk24_2nd_ws::r2::robot_config::impl::center_to_wheel;
-	using nhk24_2nd_ws::r2::robot_config::impl::wheel_radius;
-	using nhk24_2nd_ws::r2::robot_config::impl::wheel_to_motor_ratio;
-	using nhk24_2nd_ws::r2::robot_config::impl::area_half_diagonal;
-	using nhk24_2nd_ws::r2::robot_config::impl::shadow_filter_threshold_angle;
-	using nhk24_2nd_ws::r2::robot_config::impl::shadow_window;
+	using impl::ids;
+	using impl::footprint_half_diagonal;
+	using impl::max_v;
+	using impl::max_a;
+	using impl::max_vxy;
+	using impl::max_vth;
+	using impl::max_axy;
+	using impl::max_ath;
+	using impl::center_to_wheel;
+	using impl::wheel_radius;
+	using impl::wheel_to_motor_ratio;
+	using impl::area_half_diagonal;
+	using impl::shadow_filter_threshold_angle;
+	using impl::shadow_window;
+	using impl::go_up_slope_speed;
+	using impl::go_up_slope_duration;
+	using impl::area2_initialpose;
+	using impl::area3_initialpose;
 }
 
