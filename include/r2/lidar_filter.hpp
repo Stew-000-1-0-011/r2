@@ -11,6 +11,7 @@
 #include <my_include/std_types.hpp>
 #include <my_include/xyth.hpp>
 #include <my_include/operator_generator.hpp>
+#include <my_include/debug_print.hpp>
 
 namespace nhk24_2nd_ws::r2::lidar_filter::impl {
 	using xyth::Xy;
@@ -24,7 +25,9 @@ namespace nhk24_2nd_ws::r2::lidar_filter::impl {
 		float angle_increment;
 
 		static constexpr auto make(std::vector<float>&& range, const float angle_min, const float angle_max) noexcept -> LidarScan {
-			return LidarScan{std::move(range), angle_min, (angle_max - angle_min) / range.size()};
+			const auto size = range.size();
+			auto ret = LidarScan{std::move(range), angle_min, (angle_max - angle_min) / size};  // move済みの値に触らないよう注意！
+			return ret;
 		}
 
 		constexpr auto r_th(const usize i) const noexcept -> std::pair<float, float> {
@@ -60,7 +63,10 @@ namespace nhk24_2nd_ws::r2::lidar_filter::impl {
 	inline auto apply_filter(LidarScan&& scan, Filter_&& filter) -> LidarScan {
 		for(usize i = 0; i < scan.range.size(); i++) {
 			const auto [r, th] = scan.r_th(i);
-			if(not filter.update(r, th)) scan.range[i] = std::numeric_limits<float>::quiet_NaN();
+			if(not filter.update(r, th)) {
+				// scan.range[i] = std::numeric_limits<float>::quiet_NaN();
+				scan.range[i] = 0.0f;
+			}
 		}
 		return std::move(scan);
 	}
@@ -124,7 +130,7 @@ namespace nhk24_2nd_ws::r2::lidar_filter::impl {
 		constexpr auto is_shadow(const float r, const float other_r, const float delta_theta) noexcept -> bool {
 			const float diff_x = r * std::sin(delta_theta);
 			const float diff_y = other_r - r * std::cos(delta_theta);
-			return std::fabs(diff_y / diff_x) < threshold_tan;
+			return std::fabs(diff_y / diff_x) > threshold_tan;
 		}
 	};
 }

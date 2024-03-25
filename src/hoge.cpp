@@ -1,19 +1,20 @@
-#include <my_include/debug_print.hpp>
+#include <cstddef>
+#include <cmath>
+#include <vector>
+#include <iostream>
 
-using nhk24_2nd_ws::debug_print::printlns;
+struct LidarScan final {
+	std::vector<float> range;
+	float angle_increment;
+
+	static constexpr auto make(std::vector<float>&& range, const float angle_min, const float angle_max) noexcept -> LidarScan {
+		std::cout << "in make before ret: " << (angle_max - angle_min) << range.size() << std::endl;
+		auto ret = LidarScan{std::move(range), (angle_max - angle_min) / range.size()};
+		std::cout << "in make ret: " << ret.angle_increment << std::endl;
+		return ret;
+	}
+};
 
 int main() {
-	//printlns test
-	
-	printlns("Hello, World!", 42, 3.14);
-	printlns(std::string_view{"Hello, World!"});
-	printlns(std::string{"Hello, World!"});
-	printlns(std::string{"Hello, World!"}.c_str());
-	printlns(std::vector<int>{1, 2, 3});
-	printlns(std::vector<std::vector<int>>{{1, 2, 3}, {4, 5, 6}});
-	printlns(std::variant<int, double>{42});
-	printlns(std::variant<int, double>{3.14});
-	printlns(std::variant<std::monostate, int, double>{});
-	printlns(std::optional<int>{});
-	printlns(std::optional<int>{42});
+	auto scan = LidarScan::make(std::vector<float>(1000, 0.0f), 0, 3.14 * 1.5);
 }

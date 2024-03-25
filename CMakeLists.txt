@@ -63,29 +63,29 @@ ament_target_dependencies(filter_node
   can_plugins2
 )
 
-# # 
-# add_executable(hoge_node
-#   src/hoge.cpp
-# )
-# ament_target_dependencies(hoge_node
-#   rclcpp
-#   std_msgs
-#   std_srvs
-#   nav2_msgs
-#   lifecycle_msgs
-#   tf2
-#   tf2_ros
-#   tf2_geometry_msgs
-#   can_plugins2
-#   sensor_msgs
-# )
+# 
+add_executable(hoge_node
+  src/hoge.cpp
+)
+ament_target_dependencies(hoge_node
+  rclcpp
+  std_msgs
+  std_srvs
+  nav2_msgs
+  lifecycle_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  can_plugins2
+  sensor_msgs
+)
 
 # 
 install(
   TARGETS
     r2_node  #
     filter_node  #
-    # hoge_node  #
+    hoge_node  #
   DESTINATION lib/${PROJECT_NAME}
 )
 

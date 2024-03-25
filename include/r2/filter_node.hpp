@@ -57,6 +57,7 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 
 		void callback(sensor_msgs::msg::LaserScan::SharedPtr msg) {
 			auto scan = LidarScan::make(std::move(msg->ranges), msg->angle_min, msg->angle_max);
+
 			const auto lidar_pose = get_pose(tf_buffer, "map", "lidar_link");
 			const auto base_pose = get_pose(tf_buffer, "map", "base_link");
 
@@ -70,21 +71,22 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 			}
 
 			auto chained = filter_chain (
-				BoxFilter::make (
+				!FilterOp{}* BoxFilter::make (
 					*lidar_pose
 					, *base_pose
 					, footprint_half_diagonal
 				)
-				// , !FilterOp{}* BoxFilter::make (
-				// 	*lidar_pose
-				// 	, Xyth::make(area_half_diagonal +XyOp{}+ Xy::make(0.050, 0.050), 0.0)
-				// 	, area_half_diagonal *XyOp{}* 1.3
-				// )
-				, ShadowFilter::make (
-					shadow_filter_threshold_angle
-					, shadow_window
-					, scan
+				, BoxFilter::make (
+					*lidar_pose
+					, Xyth::make(area_half_diagonal +XyOp{}+ Xy::make(0.050, 0.050), 0.0)
+					// , *base_pose
+					, area_half_diagonal *XyOp{}* 1.1
 				)
+				// , ShadowFilter::make (
+				// 	shadow_filter_threshold_angle
+				// 	, shadow_window
+				// 	, scan
+				// )
 			);
 
 			auto filtered_scan = apply_filter(std::move(scan), std::move(chained));

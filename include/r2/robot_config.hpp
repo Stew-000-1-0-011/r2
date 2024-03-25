@@ -38,7 +38,7 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 
 	inline constexpr Xy area_half_diagonal = Xy::make(5.975 / 2, 4.100 / 2);  // エリアの半対角線長[m]
 
-	inline constexpr double shadow_filter_threshold_angle = 0.100;  // シャドウフィルタの閾値[rad]
+	inline constexpr double shadow_filter_threshold_angle = std::numbers::pi / 15.0;  // シャドウフィルタの閾値[rad]
 	inline constexpr u16 shadow_window = 10;  // シャドウフィルタの窓幅
 
 	inline constexpr Xyth go_up_slope_speed = Xyth::make(Xy::make(0.0, 1.0), 0.0);  // 坂道を登るときの速度
