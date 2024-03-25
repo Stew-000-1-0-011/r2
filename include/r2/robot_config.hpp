@@ -31,7 +31,7 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 	inline constexpr double max_vxy = 1.0 * 0.3;  // 最大並進速度[m/s]
 	inline constexpr double max_vth = std::numbers::pi / 3.0 * 0.3;  // 最大角速度[rad/s]
 	inline constexpr double max_axy = 3.0 * 0.3;  // 最大並進加速度[m/s^2]
-	inline constexpr double max_ath = std::numbers::pi / 3.0 * 0.1;  // 最大角加速度[rad/s^2]
+	inline constexpr double max_ath = std::numbers::pi / 3.0 * 0.9;  // 最大角加速度[rad/s^2]
 	inline constexpr double center_to_wheel = footprint_half_diagonal.norm();  // 中心から駆動輪までの距離[m]
 	inline constexpr double wheel_radius = 0.060;  // 駆動輪の半径[m](雑)
 	inline constexpr double wheel_to_motor_ratio = 33.45;  // 駆動輪からモーターへの倍速比
