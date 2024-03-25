@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
 	std::jthread state_machine_thread([io_fut = std::move(io_fut)] mutable {
 		printlns("state_machine_thread start.");
 		auto machine = StateMachine<Io>::make(
-			transit_state::to_pass_area1()
+			transit_state::to_manual(transit_state::to_pass_area1())
 		);
 		auto io = io_fut.get();
 		if(io) machine.run(**io);
