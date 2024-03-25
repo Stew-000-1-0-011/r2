@@ -137,7 +137,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				}
 				this->io->manual_speed.set(Xyth::make (
 					Xy::make (
-						joy.axes[Axes::l_stick_LR] * robot_config::max_vxy / std::sqrt(2.0)
+						-joy.axes[Axes::l_stick_LR] * robot_config::max_vxy / std::sqrt(2.0)
 						, joy.axes[Axes::l_stick_UD] * robot_config::max_vxy / std::sqrt(2.0)
 					)
 					, joy.axes[Axes::r_stick_LR] * robot_config::max_vth
@@ -150,7 +150,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				if(current_pose.has_value()) {
 					this->io->current_pose.set(*current_pose);
 				}
-				printlns("current_pose: ", this->io->current_pose.get());
+				// printlns("current_pose: ", this->io->current_pose.get());
 
 				// output
 				const auto body_speed = this->io->body_speed.get();
@@ -158,10 +158,10 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				this->send_motor_speeds(motor_speeeds);
 
 				// debug
-				printlns("body_speed: ", body_speed);
-				printlns("motor_speeeds: ", motor_speeeds);
+				// printlns("body_speed: ", body_speed);
+				// printlns("motor_speeeds: ", motor_speeeds);
 				const auto manual_speed = this->io->manual_speed.get();
-				printlns("manual_speed: ", manual_speed);
+				// printlns("manual_speed: ", manual_speed);
 			}
 
 			void send_motor_speeds(const std::array<double, 4>& speeds) {
