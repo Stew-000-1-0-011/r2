@@ -19,19 +19,20 @@
 #include "robot_config.hpp"
 
 namespace nhk24_2nd_ws::r2::filter_node::impl {
-	using nhk24_2nd_ws::xyth::Xy;
-	using nhk24_2nd_ws::xyth::XyOp;
-	using nhk24_2nd_ws::xyth::Xyth;
-	using nhk24_2nd_ws::r2::ros2_utils::get_pose;
-	using nhk24_2nd_ws::r2::lidar_filter::LidarScan;
-	using nhk24_2nd_ws::r2::lidar_filter::BoxFilter;
-	using nhk24_2nd_ws::r2::lidar_filter::ShadowFilter;
-	using nhk24_2nd_ws::r2::lidar_filter::filter_chain;
-	using nhk24_2nd_ws::r2::lidar_filter::apply_filter;
-	using nhk24_2nd_ws::r2::robot_config::footprint_half_diagonal;
-	using nhk24_2nd_ws::r2::robot_config::area_half_diagonal;
-	using nhk24_2nd_ws::r2::robot_config::shadow_filter_threshold_angle;
-	using nhk24_2nd_ws::r2::robot_config::shadow_window;
+	using xyth::Xy;
+	using xyth::XyOp;
+	using xyth::Xyth;
+	using ros2_utils::get_pose;
+	using lidar_filter::LidarScan;
+	using lidar_filter::FilterOp;
+	using lidar_filter::BoxFilter;
+	using lidar_filter::ShadowFilter;
+	using lidar_filter::filter_chain;
+	using lidar_filter::apply_filter;
+	using robot_config::footprint_half_diagonal;
+	using robot_config::area_half_diagonal;
+	using robot_config::shadow_filter_threshold_angle;
+	using robot_config::shadow_window;
 
 	struct FilterNode final : rclcpp::Node {
 		sensor_msgs::msg::LaserScan last_msgs{};
@@ -74,11 +75,11 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 					, *base_pose
 					, footprint_half_diagonal
 				)
-				, BoxFilter::make (
-					*lidar_pose
-					, Xyth::make(area_half_diagonal +XyOp{}+ Xy::make(0.050, 0.050), 0.0)
-					, area_half_diagonal
-				)
+				// , !FilterOp{}* BoxFilter::make (
+				// 	*lidar_pose
+				// 	, Xyth::make(area_half_diagonal +XyOp{}+ Xy::make(0.050, 0.050), 0.0)
+				// 	, area_half_diagonal *XyOp{}* 1.3
+				// )
 				, ShadowFilter::make (
 					shadow_filter_threshold_angle
 					, shadow_window
@@ -106,5 +107,5 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 }
 
 namespace nhk24_2nd_ws::r2::filter_node {
-	using nhk24_2nd_ws::r2::filter_node::impl::FilterNode;
+	using filter_node::impl::FilterNode;
 }

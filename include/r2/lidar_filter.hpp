@@ -10,11 +10,13 @@
 
 #include <my_include/std_types.hpp>
 #include <my_include/xyth.hpp>
+#include <my_include/operator_generator.hpp>
 
 namespace nhk24_2nd_ws::r2::lidar_filter::impl {
-	using nhk24_2nd_ws::xyth::Xy;
-	using nhk24_2nd_ws::xyth::Xyth;
-	inline constexpr auto xyop = nhk24_2nd_ws::xyth::impl::XyOp{};
+	using xyth::Xy;
+	using xyth::Xyth;
+	inline constexpr auto xyop = xyth::XyOp{};
+	using operator_generator::AutoUnaryOp;
 
 	struct LidarScan final {
 		std::vector<float> range;
@@ -62,6 +64,21 @@ namespace nhk24_2nd_ws::r2::lidar_filter::impl {
 		}
 		return std::move(scan);
 	}
+
+	template<chainable_filter ChainableFilter_>
+	struct NotFilter final : ChainableFilterMarker {
+		ChainableFilter_ filter;
+
+		auto update(const double r, const double th) -> bool {
+			return !filter.update(r, th);
+		}
+	};
+
+	struct FilterOp final
+	: AutoUnaryOp<"!", []<class Filter_>requires chainable_filter<std::remove_cvref_t<Filter_>>(Filter_&& filter) -> NotFilter<std::remove_cvref_t<Filter_>> {
+		return NotFilter{{}, std::forward<Filter_>(filter)};
+	}>
+	{};
 
 	struct BoxFilter final : ChainableFilterMarker {
 		Xyth lidar_pose;
@@ -116,6 +133,7 @@ namespace nhk24_2nd_ws::r2::lidar_filter {
 	using impl::LidarScan;
 	using impl::filter_chain;
 	using impl::apply_filter;
+	using impl::FilterOp;
 	using impl::BoxFilter;
 	using impl::ShadowFilter;
 }
