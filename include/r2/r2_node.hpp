@@ -35,6 +35,7 @@
 #include <my_include/xyth.hpp>
 #include <my_include/debug_print.hpp>
 
+#include "geometry_msgs_convertor.hpp"
 #include "robot_config.hpp"
 #include "robot_io.hpp"
 #include "omni4.hpp"
@@ -210,6 +211,16 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					initial_pose_msg.pose.pose.orientation.z = std::sin(initial_pose.th / 2);  // ここら辺ほんとにあってるか不安(copilotくんはこう出してる)
 					initial_pose_msg.pose.pose.orientation.w = std::cos(initial_pose.th / 2);
 					this->initial_pose_pub->publish(initial_pose_msg);
+
+					// 最初のtransformを吐く
+					geometry_msgs::msg::TransformStamped transform{};
+					transform.header.frame_id = "map";
+					transform.header.stamp = this->now();
+					transform.child_frame_id = "base_link";
+					transform.transform.rotation = initial_pose_msg.pose.pose.orientation;
+					transform.transform.translation.x = initial_pose.xy.x;
+					transform.transform.translation.y = initial_pose.xy.y;
+					this->tf2_broadcaster.sendTransform(transform);
 
 					printlns("initial_pose is set.");
 				}
