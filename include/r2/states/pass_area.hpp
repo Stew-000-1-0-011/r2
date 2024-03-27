@@ -70,12 +70,15 @@ namespace nhk24_2nd_ws::r2::pass_area::impl {
 						, 0.25
 					);
 					
-					io.body_speed.set(body_speed);
 					
 					if(is_reached) {
+						io.body_speed.set(Xyth::zero());
 						return nsg();
 					}
-					else return std::nullopt;
+					else {
+						io.body_speed.set(body_speed);
+						return std::nullopt;
+					}
 				}
 			}
 			, 10ms

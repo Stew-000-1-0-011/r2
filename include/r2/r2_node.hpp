@@ -160,7 +160,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 				// debug
 				// printlns("body_speed: ", body_speed);
-				// printlns("motor_speeeds: ", motor_speeeds);
+				printlns("motor_speeeds: ", motor_speeeds);
 				const auto manual_speed = this->io->manual_speed.get();
 				// printlns("manual_speed: ", manual_speed);
 			}
@@ -216,11 +216,13 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					geometry_msgs::msg::TransformStamped transform{};
 					transform.header.frame_id = "map";
 					transform.header.stamp = this->now();
-					transform.child_frame_id = "base_link";
+					transform.child_frame_id = "odom";
 					transform.transform.rotation = initial_pose_msg.pose.pose.orientation;
 					transform.transform.translation.x = initial_pose.xy.x;
 					transform.transform.translation.y = initial_pose.xy.y;
 					this->tf2_broadcaster.sendTransform(transform);
+
+					rclcpp::sleep_for(500ms);
 
 					printlns("initial_pose is set.");
 				}
