@@ -81,7 +81,7 @@ namespace nhk24_2nd_ws::r2::transit_state {
 				manual_to_auto(std::move(evacuated_state))
 				, [](auto&& ... args){return manual_control(std::forward<decltype(args)>(args) ...);}
 			}
-			, 10ms
+			, 20ms
 		);
 
 		return std::make_unique<decltype(state)>(std::move(state));

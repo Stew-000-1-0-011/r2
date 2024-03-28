@@ -151,7 +151,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				if(current_pose.has_value()) {
 					this->io->current_pose.set(*current_pose);
 				}
-				// printlns("current_pose: ", this->io->current_pose.get());
+				printlns("current_pose: ", this->io->current_pose.get());
 
 				// output
 				const auto body_speed = this->io->body_speed.get();
@@ -160,8 +160,8 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 				// debug
 				// printlns("body_speed: ", body_speed);
-				printlns("motor_speeeds: ", motor_speeeds);
-				const auto manual_speed = this->io->manual_speed.get();
+				// printlns("motor_speeeds: ", motor_speeeds);
+				// const auto manual_speed = this->io->manual_speed.get();
 				// printlns("manual_speed: ", manual_speed);
 			}
 

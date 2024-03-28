@@ -81,7 +81,7 @@ namespace nhk24_2nd_ws::r2::pass_area::impl {
 					}
 				}
 			}
-			, 10ms
+			, 20ms
 		);
 
 		return std::make_unique<decltype(state)>(std::move(state));

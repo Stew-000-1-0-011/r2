@@ -65,7 +65,7 @@ namespace nhk24_2nd_ws::r2::transit_state {
 					return std::nullopt;
 				}
 			}
-			, 10ms
+			, 20ms
 		);
 
 		return std::make_unique<decltype(state)>(std::move(state));
