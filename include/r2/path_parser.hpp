@@ -51,17 +51,20 @@ namespace nhk24_2nd_ws::r2::path_parser::impl {
 	struct PathName final {
 		enum class Enum : u8 {
 			start_to_area2
-			, area2_to_area3
+			, area2_to_yellow
+			, yellow_to_storage
 		};
 
 		using Enum::start_to_area2;
-		using Enum::area2_to_area3;
+		using Enum::area2_to_yellow;
+		using Enum::yellow_to_storage;
 
 		static auto load_path(const Enum path_name) -> std::expected<std::vector<Xyth>, std::string> {
 			std::string_view path_file{};
 			switch(path_name) {
 				case start_to_area2: path_file = "start_to_area2"; break;
-				case area2_to_area3: path_file = "area2_to_area3"; break;
+				case area2_to_yellow: path_file = "area2_to_yellow"; break;
+				case yellow_to_storage: path_file = "yellow_to_storage"; break;
 				default: path_file = "unreachable";
 			}
 

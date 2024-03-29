@@ -6,3 +6,4 @@
 #include "pass_area.hpp"
 #include "go_up_slope.hpp"
 #include "dancing.hpp"
+#include "collect_ball.hpp"

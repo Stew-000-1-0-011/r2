@@ -44,8 +44,8 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 	inline constexpr Xyth go_up_slope_speed = Xyth::make(Xy::make(0.0, 1.0), 0.0);  // 坂道を登るときの速度
 	inline constexpr std::chrono::duration<double> go_up_slope_duration = 5.0s;  // 坂道を登るときの時間
 	inline constexpr Xyth area1_initialpose = Xyth::make(Xy::make(5.425, 0.400), 0.0);  // エリア1の初期位置
-	inline constexpr Xyth area2_from_slop_initialpose = Xyth::make(Xy::make(5.425, 0.400), 0.0);  // エリア2の坂越え後の初期位置
-	inline constexpr Xyth area3_from_slop_initialpose = Xyth::make(Xy::make(1.425, 0.400), 0.0);  // エリア3の坂越え後の初期位置
+	inline constexpr Xyth area2_before_slope_initialpose = Xyth::make(Xy::make(5.425, -1.400), 0.0);  // エリア2の坂越え後の初期位置
+	inline constexpr Xyth area3_before_slope_initialpose = Xyth::make(Xy::make(1.425, -1.400), 0.0);  // エリア3の坂越え後の初期位置
 }
 
 namespace nhk24_2nd_ws::r2::robot_config {
@@ -66,7 +66,7 @@ namespace nhk24_2nd_ws::r2::robot_config {
 	using impl::go_up_slope_speed;
 	using impl::go_up_slope_duration;
 	using impl::area1_initialpose;
-	using impl::area2_from_slop_initialpose;
-	using impl::area3_from_slop_initialpose;
+	using impl::area2_before_slope_initialpose;
+	using impl::area3_before_slope_initialpose;
 }
 

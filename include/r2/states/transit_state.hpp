@@ -34,5 +34,7 @@ namespace nhk24_2nd_ws::r2::transit_state {
 	inline auto to_slope_1to2() -> std::unique_ptr<StateBase>;
 	inline auto to_pass_area2() -> std::unique_ptr<StateBase>;
 	inline auto to_slope_2to3() -> std::unique_ptr<StateBase>;
+	inline auto to_pass_yellow() -> std::unique_ptr<StateBase>;
+	inline auto to_collect_ball() -> std::unique_ptr<StateBase>;
 	inline auto to_dancing() -> std::unique_ptr<StateBase>;
 }

@@ -73,6 +73,7 @@ namespace nhk24_2nd_ws::r2::pass_area::impl {
 					
 					if(is_reached) {
 						io.body_speed.set(Xyth::zero());
+						std::this_thread::sleep_for(1s);  // わかりやすさのため
 						return nsg();
 					}
 					else {
@@ -107,7 +108,7 @@ namespace nhk24_2nd_ws::r2::transit_state {
 	inline auto to_pass_area2() -> std::unique_ptr<StateBase> {
 		using namespace pass_area::impl;
 
-		auto path = PathName::load_path(PathName::area2_to_area3);
+		auto path = PathName::load_path(PathName::area2_to_yellow);
 		if(!path.has_value()) {
 			return to_error_state(std::string("Failed to load path: ") + path.error());
 		}
@@ -115,6 +116,21 @@ namespace nhk24_2nd_ws::r2::transit_state {
 			return to_pass_area(
 				std::move(*path)
 				, to_slope_2to3
+			);
+		}
+	}
+
+	inline auto to_pass_yellow() -> std::unique_ptr<StateBase> {
+		using namespace pass_area::impl;
+
+		auto path = PathName::load_path(PathName::yellow_to_storage);
+		if(!path.has_value()) {
+			return to_error_state(std::string("Failed to load path: ") + path.error());
+		}
+		else {
+			return to_pass_area (
+				std::move(*path)
+				, to_collect_ball
 			);
 		}
 	}

@@ -34,6 +34,9 @@
 #include <my_include/void.hpp>
 #include <my_include/xyth.hpp>
 #include <my_include/debug_print.hpp>
+#include <my_include/sum_last_n.hpp>
+#include <my_include/operator_generator.hpp>
+#include <my_include/mutexed.hpp>
 
 #include "geometry_msgs_convertor.hpp"
 #include "robot_config.hpp"
@@ -49,7 +52,11 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using void_::Void;
 	using xyth::Xy;
 	using xyth::Xyth;
+	using xyth::XyOp;
 	using debug_print::printlns;
+	using sum_last_n::SumLastN;
+	using operator_generator::BinaryLeftOp;
+	using mutexed::Mutexed;
 
 	using robot_io::Io;
 	using robot_io::MapName;
@@ -61,10 +68,23 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using ros2_utils::get_pose;
 	using shirasu::target_frame;
 
+	struct XythLinear final
+		: BinaryLeftOp<"+", +[](const Xyth& lhs, const Xyth& rhs) -> Xyth {
+			return Xyth::make(lhs.xy +XyOp{}+ rhs.xy, lhs.th + rhs.th);
+		}>
+		, BinaryLeftOp<"-", +[](const Xyth& lhs, const Xyth& rhs) -> Xyth {
+			return Xyth::make(lhs.xy -XyOp{}- rhs.xy, lhs.th - rhs.th);
+		}>
+		, BinaryLeftOp<"/", +[](const Xyth& lhs, const double rhs) -> Xyth {
+			return Xyth::make(lhs.xy /XyOp{}/ rhs, lhs.th / rhs);
+		}>
+	{};
+
 	namespace {
 		struct R2Node final : rclcpp::Node {
 			Io * io;
 			Omni4 omni4;
+			Mutexed<SumLastN<Xyth, XythLinear>> current_pose_sum;
 
 			tf2_ros::TransformBroadcaster tf2_broadcaster;
 			tf2_ros::Buffer tf2_buffer;
@@ -89,6 +109,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				: rclcpp::Node("r2", options)
 				, io{io}
 				, omni4{Omni4::make()}
+				, current_pose_sum{Mutexed<SumLastN<Xyth, XythLinear>>::make(SumLastN<Xyth, XythLinear>::make(10))}
 				, tf2_broadcaster{*this}
 				, tf2_buffer{this->get_clock()}
 				, tf2_listener{tf2_buffer}
@@ -149,7 +170,11 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				// input
 				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
 				if(current_pose.has_value()) {
-					this->io->current_pose.set(*current_pose);
+					auto current_pose_average = this->current_pose_sum.modify([current_pose](auto& sum) -> Xyth {
+						sum.push(*current_pose);
+						return sum.get_average();
+					});
+					this->io->current_pose.set(current_pose_average);
 				}
 				printlns("current_pose: ", this->io->current_pose.get());
 
@@ -175,6 +200,9 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 			void change_map(const MapName::Enum filepath, const Xyth& initial_pose) {
 				{
+					this->current_pose_sum.modify([](auto& sum) {
+						sum.clear();
+					});
 					io->busy_loop([this]() -> std::optional<Void> {
 						// amclを非アクティブ状態にする
 						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();

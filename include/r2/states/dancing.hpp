@@ -30,6 +30,7 @@ namespace nhk24_2nd_ws::r2::dancing::impl {
 		bool is_turning_left;
 	};
 }
+
 namespace nhk24_2nd_ws::r2::transit_state {
 	inline auto to_dancing() -> std::unique_ptr<StateBase> {
 		using namespace dancing::impl;
