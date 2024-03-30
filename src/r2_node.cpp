@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
 	rclcpp::init(argc, argv);
 
 	auto manual_stop_node = std::make_shared<ManualStopNode>();
-	auto [node, io_fut] = make_node();
+	auto [node, io_fut, io_uptr] = make_node();
 
 	rclcpp::on_shutdown([node] {
 		node->kill();

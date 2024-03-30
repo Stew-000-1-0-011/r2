@@ -280,10 +280,10 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 		inline auto make_node (
 			const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
-		) -> std::tuple<std::shared_ptr<R2Node>, std::future<std::optional<std::unique_ptr<Io>>>> {
+		) -> std::tuple<std::shared_ptr<R2Node>, std::future<std::optional<Io *>>, std::unique_ptr<Io>> {
 			auto io = Io::make_unique();
 			auto node = std::make_shared<R2Node>(io.get(), options);
-			auto fut = std::async(std::launch::async, [io = std::move(io), node = node]() mutable -> std::optional<std::unique_ptr<Io>> {
+			auto fut = std::async(std::launch::async, [io = io.get(), node = node]() mutable -> std::optional<Io *> {
 				// ここ順番が大事。
 				// どいつがどのライフサイクルか、どのライフサイクルでどのクエリが投げられるかを考えること
 				{
@@ -364,9 +364,9 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					node->change_map(MapName::area1, robot_config::area1_initialpose);
 				}
 
-				return std::move(io);
+				return io;
 			});
-			return {std::move(node), std::move(fut)};
+			return {std::move(node), std::move(fut), std::move(io)};
 		}
 	}
 }
