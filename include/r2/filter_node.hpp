@@ -1,9 +1,12 @@
 #pragma once
 
 #include <utility>
+#include <future>
+#include <memory>
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <std_srvs/srv/empty.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 
 #include <tf2/LinearMath/Transform.h>
@@ -36,11 +39,13 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 
 	struct FilterNode final : rclcpp::Node {
 		sensor_msgs::msg::LaserScan last_msgs{};
+		std::future<std::shared_ptr<std_srvs::srv::Empty_Response>> last_future{};
 
 		tf2_ros::Buffer tf_buffer;
 		tf2_ros::TransformListener tf_listener;
 
 		rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pub;
+		rclcpp::Client<std_srvs::srv::Empty>::SharedPtr request_nomotion_update_client;
 		rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr sub;
 		
 		FilterNode()
@@ -48,6 +53,7 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 			, tf_buffer(this->get_clock())
 			, tf_listener(tf_buffer)
 			, pub(create_publisher<sensor_msgs::msg::LaserScan>("scan", 1))
+			, request_nomotion_update_client(create_client<std_srvs::srv::Empty>("request_nomotion_update"))
 			, sub(create_subscription<sensor_msgs::msg::LaserScan>("scan_nonfiltered", 1, [this](const sensor_msgs::msg::LaserScan::SharedPtr msg) {
 				this->callback(std::move(msg));
 			}))
@@ -104,6 +110,11 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 			filtered_scan_msg.intensities = std::move(msg->intensities);
 			
 			pub->publish(filtered_scan_msg);
+
+			if(not this->last_future.valid() || this->last_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+				auto req = std::make_shared<std_srvs::srv::Empty::Request>();
+				this->last_future = std::move(request_nomotion_update_client->async_send_request(std::move(req)).future);
+			}
 		}
 	};
 }
