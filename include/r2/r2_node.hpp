@@ -176,7 +176,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					});
 					this->io->current_pose.set(current_pose_average);
 				}
-				printlns("current_pose: ", this->io->current_pose.get());
+				// printlns("current_pose: ", this->io->current_pose.get());
 
 				// output
 				const auto body_speed = this->io->body_speed.get();

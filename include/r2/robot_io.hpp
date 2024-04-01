@@ -85,24 +85,33 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 		auto_evacuated
 	};
 
+	enum class LiftState : u8 {
+		up,
+		down
+	};
+
 	struct Io {
 		Mutexed<Xyth> current_pose;
 		Mutexed<Xyth> manual_speed;
+		Mutexed<std::optional<double>> ball_direction;
 		Mutexed<std::optional<StateName::Enum>> manual_recover_state;
 		Wanko<ManualAuto> change_manual_auto;
 		std::atomic_flag kill_interrupt;
 
 		Mutexed<Xyth> body_speed;
+		Wanko<LiftState> lift_state;
 
 		std::function<auto (const MapName::Enum, const Xyth&) -> std::future<void>> change_map;
 
 		Io()
 			: current_pose(Mutexed<Xyth>::make(Xyth::zero()))
 			, manual_speed(Mutexed<Xyth>::make(Xyth::zero()))
+			, ball_direction(Mutexed<std::optional<double>>::make(std::nullopt))
 			, manual_recover_state(Mutexed<std::optional<StateName::Enum>>::make(std::nullopt))
 			, change_manual_auto(Wanko<ManualAuto>::make())
 			, kill_interrupt(ATOMIC_FLAG_INIT)
 			, body_speed(Mutexed<Xyth>::make(Xyth::zero()))
+			, lift_state(Wanko<LiftState>::make())
 			, change_map(nullptr)
 		{}
 
@@ -136,4 +145,5 @@ namespace nhk24_2nd_ws::r2::robot_io {
 	using impl::MapName;
 	using impl::StateName;
 	using impl::ManualAuto;
+	using impl::LiftState;
 }

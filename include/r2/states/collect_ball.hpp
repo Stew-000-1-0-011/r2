@@ -14,6 +14,10 @@ namespace nhk24_2nd_ws::r2::collect_ball::impl {
 }
 
 namespace nhk24_2nd_ws::r2::transit_state {
+	inline auto to_plunge_balls() -> std::unique_ptr<StateBase> {
+		return nullptr;
+	}
+
 	inline auto to_collect_ball() -> std::unique_ptr<StateBase> {
 		using namespace collect_ball::impl;
 
@@ -30,5 +34,9 @@ namespace nhk24_2nd_ws::r2::transit_state {
 		);
 
 		return std::make_unique<decltype(state)>(std::move(state));
+	}
+
+	inline auto to_go_back_center() -> std::unique_ptr<StateBase> {
+		return nullptr;
 	}
 }

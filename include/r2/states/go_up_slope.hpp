@@ -14,13 +14,15 @@
 #include "transit_state.hpp"
 
 namespace nhk24_2nd_ws::r2::go_up_slope::impl {
+	using namespace std::chrono_literals;
+	using xyth::Xy;
 	using xyth::Xyth;
 	using state_machine::make_non_loop_state;
 	using debug_print::printlns;
-	using robot_config::go_up_slope_speed;
+	using robot_config::slope_speed;
 	using robot_config::go_up_slope_duration;
 	using robot_config::area2_before_slope_initialpose;
-	using robot_config::area3_before_slope_initialpose;
+	using robot_config::storage_entry_point;
 	using robot_io::Io;
 	using robot_io::MapName;
 	using transit_state::StateBase;
@@ -31,15 +33,13 @@ namespace nhk24_2nd_ws::r2::go_up_slope::impl {
 	requires requires(std::remove_cvref_t<NextStateGenerator_> nsg) {
 		{nsg()} -> std::convertible_to<std::unique_ptr<StateBase>>;
 	}
-	inline auto to_go_up_slope(const MapName::Enum next_map, const Xyth& initialpose, NextStateGenerator_&& nsg) -> std::unique_ptr<StateBase> {
+	inline auto to_go_up_slope(NextStateGenerator_&& nsg, const Xyth& speed) -> std::unique_ptr<StateBase> {
 		auto state = make_non_loop_state<Io> (
-			[next_map, initialpose, nsg = std::move(nsg)](Io& io) -> std::unique_ptr<StateBase> {
-				io.change_map(next_map, initialpose).get();
-				printlns("go up slope: ", MapName::to_filepath(next_map), " (", initialpose, ")");
-
-				io.body_speed.set(go_up_slope_speed);
+			[nsg = std::move(nsg), speed](Io& io) -> std::unique_ptr<StateBase> {
+				io.body_speed.set(speed);
 				std::this_thread::sleep_for(go_up_slope_duration);
-
+				io.body_speed.set(Xyth::zero());
+				std::this_thread::sleep_for(1s);
 				return nsg();
 			}
 		);
@@ -51,11 +51,16 @@ namespace nhk24_2nd_ws::r2::go_up_slope::impl {
 namespace nhk24_2nd_ws::r2::transit_state {
 	inline auto to_slope_1to2() -> std::unique_ptr<StateBase> {
 		using namespace go_up_slope::impl;
-		return to_go_up_slope(MapName::area2, area2_before_slope_initialpose, to_pass_area2);
+		return to_go_up_slope(to_pass_area2, slope_speed);
 	}
 
 	inline auto to_slope_2to3() -> std::unique_ptr<StateBase> {
 		using namespace go_up_slope::impl;
-		return to_go_up_slope(MapName::area3_yellow, area3_before_slope_initialpose, to_dancing);
+		return to_go_up_slope(to_dancing, slope_speed);
+	}
+
+	inline auto to_slope_YtoS() -> std::unique_ptr<StateBase> {
+		using namespace go_up_slope::impl;
+		return to_go_up_slope(to_dancing, slope_speed);
 	}
 }
