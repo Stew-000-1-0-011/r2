@@ -21,7 +21,6 @@ namespace nhk24_2nd_ws::r2::go_up_slope::impl {
 	using debug_print::printlns;
 	using robot_config::slope_speed;
 	using robot_config::go_up_slope_duration;
-	using robot_config::area2_before_slope_initialpose;
 	using robot_config::storage_entry_point;
 	using robot_io::Io;
 	using robot_io::MapName;
@@ -39,7 +38,7 @@ namespace nhk24_2nd_ws::r2::go_up_slope::impl {
 				io.body_speed.set(speed);
 				std::this_thread::sleep_for(go_up_slope_duration);
 				io.body_speed.set(Xyth::zero());
-				std::this_thread::sleep_for(1s);
+				std::this_thread::sleep_for(0.5s);
 				return nsg();
 			}
 		);

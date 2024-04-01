@@ -168,7 +168,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 			void timer_callback() {
 				// input
-				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
+				const auto current_pose = get_pose(this->tf2_buffer, "map", "true_base_link");
 				if(current_pose.has_value()) {
 					auto current_pose_average = this->current_pose_sum.modify([current_pose](auto& sum) -> Xyth {
 						sum.push(*current_pose);

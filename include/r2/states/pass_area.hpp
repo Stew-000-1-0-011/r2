@@ -54,7 +54,7 @@ namespace nhk24_2nd_ws::r2::pass_area::impl {
 			[path = std::move(path), map, initialpose](Io& io) {
 
 				io.change_map(map, initialpose).get();
-				std::this_thread::sleep_for(1s);  // wait for position to stabilize
+				std::this_thread::sleep_for(3s);  // wait for position to stabilize
 				printlns("map changed: ", MapName::to_filepath(map), " (", initialpose, ")");
 
 				return PassArea {
@@ -113,8 +113,8 @@ namespace nhk24_2nd_ws::r2::transit_state {
 		}
 		else {
 			return to_pass_area (
-				MapName::area2
-				, robot_config::area2_before_slope_initialpose
+				MapName::area1
+				, robot_config::area1_initialpose
 				, std::move(*path)
 				, to_slope_1to2
 			);
@@ -130,8 +130,8 @@ namespace nhk24_2nd_ws::r2::transit_state {
 		}
 		else {
 			return to_pass_area (
-				MapName::area3_yellow
-				, robot_config::yellow_before_slope_initialpose
+				MapName::area2
+				, robot_config::area2_initialpose
 				, std::move(*path)
 				, to_slope_2to3
 			);
@@ -147,8 +147,8 @@ namespace nhk24_2nd_ws::r2::transit_state {
 		}
 		else {
 			return to_pass_area (
-				MapName::area3_storage
-				, robot_config::storage_entry_point
+				MapName::area3_yellow
+				, robot_config::yellow_initialpose
 				, std::move(*path)
 				, to_plunge_balls
 			);
