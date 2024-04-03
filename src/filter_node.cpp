@@ -18,7 +18,9 @@ int main(int argc, char *argv[]) {
 		, "--params-file"
 		, "launch/amcl.yaml"
 	};
-	amcl_options.context()->init(amcl_argv.size(), amcl_argv.data());
+	auto amcl_context = rclcpp::Context::make_shared();
+	amcl_context->init(amcl_argv.size(), amcl_argv.data());
+	amcl_options.context(amcl_context);
 	auto amcl = std::make_shared<nav2_amcl::AmclNode>(amcl_options);
 	exec.add_node(amcl->get_node_base_interface());
 
