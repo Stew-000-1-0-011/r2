@@ -16,6 +16,7 @@ find_package(rclcpp REQUIRED)  #
 find_package(std_msgs REQUIRED)  #
 find_package(std_srvs REQUIRED)  #
 find_package(sensor_msgs REQUIRED)  #
+find_package(visualization_msgs REQUIRED)  #
 find_package(geometry_msgs REQUIRED)  #
 find_package(lifecycle_msgs REQUIRED)  #
 find_package(tf2 REQUIRED)  #
@@ -23,6 +24,7 @@ find_package(tf2_ros REQUIRED)  #
 find_package(tf2_geometry_msgs REQUIRED)  #
 find_package(nav2_msgs REQUIRED)  #
 find_package(can_plugins2 REQUIRED)  #
+find_package(nav2_amcl REQUIRED)  #
 
 #
 include_directories(
@@ -57,11 +59,13 @@ ament_target_dependencies(filter_node
   std_msgs
   std_srvs
   sensor_msgs
+  visualization_msgs
   tf2
   tf2_ros
   tf2_geometry_msgs
   nav2_msgs
   can_plugins2
+  nav2_amcl
 )
 
 # 

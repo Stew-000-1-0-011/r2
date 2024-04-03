@@ -8,6 +8,7 @@
 
 #include <std_srvs/srv/empty.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
+#include <visualization_msgs/msg/marker.hpp>
 
 #include <tf2/LinearMath/Transform.h>
 #include <tf2/LinearMath/Matrix3x3.h>
@@ -119,6 +120,53 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 			// 	this->last_future = std::move(request_nomotion_update_client->async_send_request(std::move(req)).future);
 			// }
 		}
+
+		// static auto make_marker(const auto& filtered_msg, const LidarScan& scan) -> visualization_msgs::msg::Marker {
+		// 	auto scale = geometry_msgs::msg::Vector3{};
+		// 	scale.x = 0.01;
+
+		// 	auto color = std_msgs::msg::ColorRGBA{};
+		// 	color.r = 0.0;
+		// 	color.g = 1.0;
+		// 	color.b = 0.0;
+		// 	color.a = 1.0;
+
+		// 	auto points = std::vector<geometry_msgs::msg::Point>();
+		// 	points.reserve(indices.size());
+		// 	for(const auto i : indices)
+		// 	{
+		// 		const auto p = scan.nth_rtheta(i).to_vec2d();
+		// 		geometry_msgs::msg::Point point{};
+		// 		point.x = p.x;
+		// 		point.y = p.y;
+		// 		point.z = 0.0;
+		// 		points.push_back(point);
+		// 	}
+
+		// 	auto marker_msg = visualization_msgs::msg::builder::Init_Marker_header()
+		// 		.header(filtered_msg.header)
+		// 		.ns("segment_line")
+		// 		.id(0)
+		// 		.type(visualization_msgs::msg::Marker::LINE_STRIP)
+		// 		.action(visualization_msgs::msg::Marker::ADD)
+		// 		.pose(geometry_msgs::msg::Pose{})
+		// 		.scale(scale)
+		// 		.color(color)
+		// 		.lifetime(rclcpp::Duration::from_nanoseconds(0))
+		// 		.frame_locked(false)
+		// 		.points(std::move(points))
+		// 		.colors(std::vector<std_msgs::msg::ColorRGBA>{})
+		// 		.texture_resource("")
+		// 		.texture(sensor_msgs::msg::CompressedImage{})
+		// 		.uv_coordinates(std::vector<visualization_msgs::msg::UVCoordinate>{})
+		// 		.text("")
+		// 		.mesh_resource("")
+		// 		.mesh_file(visualization_msgs::msg::MeshFile{})
+		// 		.mesh_use_embedded_materials(false)
+		// 	;
+
+		// 	return marker_msg;
+		// }
 	};
 }
 
