@@ -168,7 +168,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 			void timer_callback() {
 				// input
-				const auto current_pose = get_pose(this->tf2_buffer, "map", "true_base_link");
+				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
 				if(current_pose.has_value()) {
 					auto current_pose_average = this->current_pose_sum.modify([current_pose](auto& sum) -> Xyth {
 						sum.push(*current_pose);
@@ -320,6 +320,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				{
 					io->busy_loop([node]() -> std::optional<Void> {
 						// amcl_change_state_clientを使えるようにする
+						printlns("amcl_change_state_client wait_for_service.");
 						if(node->amcl_change_state_client->wait_for_service(100ms)) {
 							return Void{};
 						}
@@ -328,6 +329,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 					io->busy_loop([node]() -> std::optional<Void> {
 						// amclをコンフィグレーション状態にする
+						printlns("amcl_change_state_client to configure.");
 						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
 						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
 						if(node->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
@@ -338,6 +340,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 					io->busy_loop([node]() -> std::optional<Void> {
 						// amclをアクティブ状態にする
+						printlns("amcl_change_state_client to active.");
 						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
 						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
 						if(node->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {

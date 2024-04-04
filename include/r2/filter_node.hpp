@@ -68,7 +68,7 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 			auto scan = LidarScan::make(std::move(msg->ranges), msg->angle_min, msg->angle_max);
 
 			const auto lidar_pose = get_pose(tf_buffer, "map", "lidar_link");
-			const auto base_pose = get_pose(tf_buffer, "map", "true_base_link");
+			const auto base_pose = get_pose(tf_buffer, "map", "base_link");
 
 			if(not lidar_pose) {
 				RCLCPP_ERROR(get_logger(), lidar_pose.error().c_str());
@@ -113,6 +113,8 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 			filtered_scan_msg.intensities = std::move(msg->intensities);
 			
 			pub->publish(filtered_scan_msg);
+
+			RCLCPP_INFO(this->get_logger(), "filter_node publish scan.");
 
 			// if(not this->last_future.valid() || this->last_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
 			// 	printlns("update.");
