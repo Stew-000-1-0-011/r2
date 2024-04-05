@@ -95,7 +95,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			tf2_ros::TransformListener tf2_listener;
 
 			rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx;
-			std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> robomas_target_frame_pubs;
+			// std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> robomas_target_frame_pubs;
 			rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_pub;
 			
 			rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
@@ -119,15 +119,15 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				, tf2_buffer{this->get_clock()}
 				, tf2_listener{tf2_buffer}
 				, can_tx{this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10)}
-				, robomas_target_frame_pubs {
-					[this]() -> std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> {
-						std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> pubs;
-						for(u32 i = 0; i < 5; ++i) {
-							pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target" + std::to_string(i + 1), 10);
-						}
-						return pubs;
-					}()
-				}
+				// , robomas_target_frame_pubs {
+				// 	[this]() -> std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> {
+				// 		std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> pubs;
+				// 		for(u32 i = 0; i < 5; ++i) {
+				// 			pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target" + std::to_string(i), 10);
+				// 		}
+				// 		return pubs;
+				// 	}()
+				// }
 				, initial_pose_pub{this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 1)}
 				, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 1,
 					[this](const sensor_msgs::msg::Joy::SharedPtr joy) {

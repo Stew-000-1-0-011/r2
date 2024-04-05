@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <chrono>
+
 #include <rclcpp/rclcpp.hpp>
 
 #include <std_msgs/msg/float32.hpp>
@@ -7,43 +10,134 @@
 #include <robomas_plugins/msg/robomas_target.hpp>
 
 #include "logicool.hpp"
+#include "robomasu.hpp"
 
 namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
+	using namespace std::chrono_literals;
 	using logicool::Axes;
+	using logicool::Buttons;
+	using robomasu::make_target_frame;
+
+	enum class Rotation {
+		stop
+		, cw
+		, ccw
+	};
+
+	enum class Lift {
+		down
+		, up
+	};
 
 	class CollectDebugNode final : public rclcpp::Node {
-		float cw_speed{1000.0f};
-		float ccw_speed{1000.0f};
+		std::array<float, 4> cw_speeds{1000.0f, 1000.0f, 1000.0f, 1000.0f};
+		std::array<float, 4> ccw_speeds{1000.0f, 1000.0f, 1000.0f, 1000.0f};
+		float low_position{0.0f};
+		float high_position{2300.0f};
+		Rotation collect{Rotation::stop};
+		Rotation load{Rotation::stop};
+		Lift lift{Lift::down};
 
-		rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr robomas_target_pub;
+		std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 5> robomas_target_pubs;
 		rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
-		rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr cw_sub;
-		rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr ccw_sub;
+		std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> cw_subs;
+		std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> ccw_subs;
+		rclcpp::TimerBase::SharedPtr timer;
 
 		public:
 		CollectDebugNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
 			: rclcpp::Node("collect_debug_node", options)
-			, robomas_target_pub(this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target", 10))
+			, robomas_target_pubs([this]{
+				std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 5> pubs{};
+				for(size_t i = 0; i < pubs.size(); ++i) {
+					pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target" + std::to_string(i), 10);
+				}
+				return pubs;
+			}())
 			, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) {
-				robomas_plugins::msg::RobomasTarget target{};
-
-				if(msg->axes[Axes::cross_UD] > 0.5) {
-					target.target = this->cw_speed;
-				} else if(msg->axes[Axes::cross_UD] < -0.5) {
-					target.target = this->ccw_speed;
+				if(msg->buttons[Buttons::lb]) {
+					this->collect = Rotation::cw;
+				} else if(msg->buttons[Buttons::rb]) {
+					this->collect = Rotation::ccw;
 				} else {
-					target.target = 0.0f;
+					this->collect = Rotation::stop;
 				}
 
-				this->robomas_target_pub->publish(target);
+				if(msg->buttons[Buttons::x]) {
+					this->load = Rotation::cw;
+				} else if(msg->buttons[Buttons::y]) {
+					this->load = Rotation::ccw;
+				} else {
+					this->load = Rotation::stop;
+				}
+				
+				if(msg->axes[Axes::cross_UD] > 0.5) {
+					this->lift = Lift::up;
+				} else if(msg->axes[Axes::cross_UD] < -0.5) {
+					this->lift = Lift::down;
+				}
 			}))
-			, cw_sub(this->create_subscription<std_msgs::msg::Float32>("cw_speed", 10, [this](const std_msgs::msg::Float32::SharedPtr msg) {
-				this->cw_speed = msg->data;
-			}))
-			, ccw_sub(this->create_subscription<std_msgs::msg::Float32>("ccw_speed", 10, [this](const std_msgs::msg::Float32::SharedPtr msg) {
-				this->ccw_speed = msg->data;
-			}))
-		{}
+			, cw_subs([this]() -> std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> {
+				std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> subs{};
+				for(size_t i = 0; i < 4; ++i) {
+					subs[i] = this->create_subscription<std_msgs::msg::Float32>("cw_speed" + std::to_string(i), 10, [this, i](const std_msgs::msg::Float32::SharedPtr msg) {
+						this->cw_speeds[i] = msg->data;
+					});
+				}
+
+				return subs;
+			}())
+			, ccw_subs([this]() -> std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> {
+				std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> subs{};
+				for(size_t i = 0; i < subs.size(); ++i) {
+					subs[i] = this->create_subscription<std_msgs::msg::Float32>("ccw_speed" + std::to_string(i), 10, [this, i](const std_msgs::msg::Float32::SharedPtr msg) {
+						this->ccw_speeds[i] = msg->data;
+					});
+				}
+				return subs;
+			}())
+		{
+			this->timer = this->create_wall_timer(10ms, [this] {
+				switch(this->collect) {
+					case Rotation::stop:
+						for(size_t i = 0; i < 3; ++i) {
+							this->robomas_target_pubs[i]->publish(make_target_frame(0.0f));
+						}
+						break;
+					case Rotation::cw:
+						for(size_t i = 0; i < 3; ++i) {
+							this->robomas_target_pubs[i]->publish(make_target_frame(this->cw_speeds[i]));
+						}
+						break;
+					case Rotation::ccw:
+						for(size_t i = 0; i < 3; ++i) {
+							this->robomas_target_pubs[i]->publish(make_target_frame(-this->ccw_speeds[i]));
+						}
+						break;
+				}
+
+				switch(this->load) {
+					case Rotation::stop:
+						this->robomas_target_pubs[3]->publish(make_target_frame(0.0f));
+						break;
+					case Rotation::cw:
+						this->robomas_target_pubs[3]->publish(make_target_frame(this->cw_speeds[3]));
+						break;
+					case Rotation::ccw:
+						this->robomas_target_pubs[3]->publish(make_target_frame(-this->ccw_speeds[3]));
+						break;
+				}
+
+				switch(this->lift) {
+					case Lift::down:
+						this->robomas_target_pubs[4]->publish(make_target_frame(this->low_position));
+						break;
+					case Lift::up:
+						this->robomas_target_pubs[4]->publish(make_target_frame(this->high_position));
+						break;
+				}
+			});
+		}
 	};
 }
 
