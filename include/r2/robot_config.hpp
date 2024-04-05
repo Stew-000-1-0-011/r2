@@ -17,11 +17,18 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 	using nhk24_2nd_ws::xyth::Xy;
 	using nhk24_2nd_ws::xyth::Xyth;
 
-	inline constexpr auto ids = std::array<std::optional<u32>, 4> {
+	inline constexpr auto test_ids = std::array<std::optional<u32>, 4> {
 		std::make_optional(0x160)
 		, std::make_optional(0x164)
 		, std::make_optional(0x110)
 		, std::make_optional(0x154)
+	};
+	
+	inline constexpr auto ids = std::array<std::optional<u32>, 4> {
+		std::make_optional(0x100)
+		, std::make_optional(0x200)
+		, std::make_optional(0x16c)
+		, std::make_optional(0x300)
 	};
 
 	inline constexpr Xy footprint_half_diagonal = Xy::make(0.500, 0.500);  // フットプリントの半対角線長[m]
@@ -50,6 +57,7 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 }
 
 namespace nhk24_2nd_ws::r2::robot_config {
+	using impl::test_ids;
 	using impl::ids;
 	using impl::footprint_half_diagonal;
 	using impl::max_v;

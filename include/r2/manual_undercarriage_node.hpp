@@ -40,7 +40,10 @@ namespace nhk24_2nd_ws::r2::manual_undercarriage_node::impl {
 			, can_tx(this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10))
 			, timer(this->create_wall_timer(10ms, [this]() {
 				const auto speeds = omni4.update(target);
-				for(const auto i : {0, 1, 2, 3}) if(const auto [id, speed] = std::pair{robot_config::ids[i], speeds[i]}; id) can_tx->publish(target_frame(*id, speed));
+				for(const auto i : {0, 1, 2, 3}) if(const auto [id, speed] = std::pair{robot_config::ids[i], speeds[i]}; id) {
+					can_tx->publish(target_frame(*id, speed));
+					rclcpp::sleep_for(10ms);
+				}
 			}))
 			, joy(this->create_subscription<sensor_msgs::msg::Joy>("joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) {
 				target.xy.x = -msg->axes[Axes::l_stick_LR] * robot_config::max_vxy / std::sqrt(2);
