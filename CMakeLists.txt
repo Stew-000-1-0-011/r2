@@ -24,6 +24,7 @@ find_package(tf2_ros REQUIRED)  #
 find_package(tf2_geometry_msgs REQUIRED)  #
 find_package(nav2_msgs REQUIRED)  #
 find_package(can_plugins2 REQUIRED)  #
+find_package(robomas_plugins REQUIRED)  #
 find_package(nav2_amcl REQUIRED)  #
 
 #
@@ -48,6 +49,7 @@ ament_target_dependencies(r2_node
   nav2_msgs
   sensor_msgs
   can_plugins2
+  robomas_plugins
 )
 
 # 
@@ -65,6 +67,25 @@ ament_target_dependencies(filter_node
   tf2_geometry_msgs
   nav2_msgs
   can_plugins2
+  nav2_amcl
+)
+
+# 
+add_executable(collect_debug_node
+  src/collect_debug_node.cpp
+)
+ament_target_dependencies(collect_debug_node
+  rclcpp
+  std_msgs
+  std_srvs
+  sensor_msgs
+  visualization_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  nav2_msgs
+  can_plugins2
+  robomas_plugins
   nav2_amcl
 )
 
@@ -90,6 +111,7 @@ install(
   TARGETS
     r2_node  #
     filter_node  #
+    collect_debug_node  #
     hoge_node  #
   DESTINATION lib/${PROJECT_NAME}
 )

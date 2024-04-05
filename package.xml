@@ -22,6 +22,7 @@
   <depend>tf2_ros</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>can_plugins2</depend>
+  <depend>robomas_plugins</depend>
   <depend>nav2_amcl</depend>
 
   <exec_depend>rosidl_default_runtime</exec_depend>

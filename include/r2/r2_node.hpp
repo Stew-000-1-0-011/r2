@@ -24,6 +24,9 @@
 #include <tf2_ros/buffer.h>
 
 #include <can_plugins2/msg/frame.hpp>
+#include <robomas_plugins/msg/robomas_frame.hpp>
+#include <robomas_plugins/msg/robomas_target.hpp>
+
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <sensor_msgs/msg/joy.hpp>
 #include <std_msgs/msg/empty.hpp>
@@ -45,6 +48,7 @@
 #include "logicool.hpp"
 #include "ros2_utils.hpp"
 #include "shirasu.hpp"
+#include "robomasu.hpp"
 
 namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using namespace std::chrono_literals;
@@ -91,6 +95,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			tf2_ros::TransformListener tf2_listener;
 
 			rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx;
+			std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> robomas_target_frame_pubs;
 			rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_pub;
 			
 			rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
@@ -114,6 +119,15 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				, tf2_buffer{this->get_clock()}
 				, tf2_listener{tf2_buffer}
 				, can_tx{this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10)}
+				, robomas_target_frame_pubs {
+					[this]() -> std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> {
+						std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> pubs;
+						for(u32 i = 0; i < 5; ++i) {
+							pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target" + std::to_string(i + 1), 10);
+						}
+						return pubs;
+					}()
+				}
 				, initial_pose_pub{this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 1)}
 				, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 1,
 					[this](const sensor_msgs::msg::Joy::SharedPtr joy) {
