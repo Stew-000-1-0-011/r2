@@ -41,6 +41,8 @@ namespace nhk24_2nd_ws::r2::manual_undercarriage_node::impl {
 			, omni4(Omni4::make())
 			, can_tx(this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10))
 			, timer(this->create_wall_timer(10ms, [this]() {
+				// const auto t = target.get();
+				// RCLCPP_INFO_STREAM(this->get_logger(), "in timer target: " << t.xy.x <<" " << t.xy.y << " " << t.th);
 				const auto speeds = omni4.update(target.get());
 				for(const auto i : {0, 1, 2, 3}) if(const auto [id, speed] = std::pair{robot_config::ids[i], speeds[i]}; id) {
 					can_tx->publish(target_frame(*id, speed));
@@ -53,7 +55,10 @@ namespace nhk24_2nd_ws::r2::manual_undercarriage_node::impl {
 				target.xy.y = msg->axes[Axes::l_stick_UD] * robot_config::max_vxy / std::sqrt(2);
 				target.th = msg->axes[Axes::r_stick_LR] * robot_config::max_vth;
 
+				RCLCPP_INFO(this->get_logger(), "in joy_subs");
 				this->target.set(target);
+				const auto t = this->target.get();
+				RCLCPP_INFO_STREAM(this->get_logger(), "target: " << t.xy.x <<" " << t.xy.y << " " << t.th);
 			}))
 		{}
 	};

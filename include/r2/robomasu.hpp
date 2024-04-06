@@ -25,7 +25,7 @@ namespace nhk24_2nd_ws::r2::robomasu {
 		frame.motor = id;
 		frame.c620 = 0;
 		frame.temp = 50;
-		frame.velkp = 0.25;
+		frame.velkp = 0.15;
 		frame.velki = 9;
 		frame.poskp = 0.5;
 		frame.stable_pos_limit_vel = 25;

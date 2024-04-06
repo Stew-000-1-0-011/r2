@@ -85,11 +85,10 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 				}
 			}))
 			, cw_subs([this]() -> std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> {
-				std::lock_guard lock(this->speeds_mtx);
-
 				std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> subs{};
 				for(size_t i = 0; i < 4; ++i) {
 					subs[i] = this->create_subscription<std_msgs::msg::Float32>("cw_speed" + std::to_string(i), 10, [this, i](const std_msgs::msg::Float32::SharedPtr msg) {
+						std::lock_guard lock(this->speeds_mtx);
 						this->cw_speeds[i] = msg->data;
 					});
 				}
@@ -97,11 +96,10 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 				return subs;
 			}())
 			, ccw_subs([this]() -> std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> {
-				std::lock_guard lock(this->speeds_mtx);
-
 				std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> subs{};
 				for(size_t i = 0; i < subs.size(); ++i) {
 					subs[i] = this->create_subscription<std_msgs::msg::Float32>("ccw_speed" + std::to_string(i), 10, [this, i](const std_msgs::msg::Float32::SharedPtr msg) {
+						std::lock_guard lock(this->speeds_mtx);
 						this->ccw_speeds[i] = msg->data;
 					});
 				}
@@ -109,54 +107,57 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 			}())
 		{
 			this->timer = this->create_wall_timer(10ms, [this] {
-				std::shared_lock lock(this->rotate_mtx);
-				std::shared_lock lock2(this->speeds_mtx);
+				const auto [collect, load, lift, cw_speeds, ccw_speeds] = [this]() -> std::tuple<Rotation, Rotation, Lift, std::array<float, 4>, std::array<float, 4>> {
+					std::shared_lock lock(this->rotate_mtx);
+					std::shared_lock lock2(this->speeds_mtx);
 
+					return {this->collect, this->load, this->lift, this->cw_speeds, this->ccw_speeds};
+				}();
 
 				switch(this->collect) {
 					case Rotation::stop:
 						for(size_t i = 0; i < 3; ++i) {
 							this->robomas_target_pubs[i]->publish(make_target_frame(0.0f));
-							rclcpp::sleep_for(10ms);
+							rclcpp::sleep_for(1ms);
 						}
 						break;
 					case Rotation::cw:
 						for(size_t i = 0; i < 3; ++i) {
-							this->robomas_target_pubs[i]->publish(make_target_frame(this->cw_speeds[i]));
-							rclcpp::sleep_for(10ms);
+							this->robomas_target_pubs[i]->publish(make_target_frame(cw_speeds[i]));
+							rclcpp::sleep_for(1ms);
 						}
 						break;
 					case Rotation::ccw:
 						for(size_t i = 0; i < 3; ++i) {
-							this->robomas_target_pubs[i]->publish(make_target_frame(-this->ccw_speeds[i]));
-							rclcpp::sleep_for(10ms);
+							this->robomas_target_pubs[i]->publish(make_target_frame(-ccw_speeds[i]));
+							rclcpp::sleep_for(1ms);
 						}
 						break;
 				}
 
-				switch(this->load) {
+				switch(load) {
 					case Rotation::stop:
 						this->robomas_target_pubs[3]->publish(make_target_frame(0.0f));
 						break;
 					case Rotation::cw:
-						this->robomas_target_pubs[3]->publish(make_target_frame(this->cw_speeds[3]));
+						this->robomas_target_pubs[3]->publish(make_target_frame(cw_speeds[3]));
 						break;
 					case Rotation::ccw:
-						this->robomas_target_pubs[3]->publish(make_target_frame(-this->ccw_speeds[3]));
+						this->robomas_target_pubs[3]->publish(make_target_frame(-ccw_speeds[3]));
 						break;
 				}
-				rclcpp::sleep_for(10ms);
+				rclcpp::sleep_for(1ms);
 
-				switch(this->lift) {
+				switch(lift) {
 					case Lift::down:
-						this->robomas_target_pubs[4]->publish(make_target_frame(this->low_position));
+						this->robomas_target_pubs[4]->publish(make_target_frame(low_position));
 						break;
 					case Lift::up:
-						this->robomas_target_pubs[4]->publish(make_target_frame(this->high_position));
+						this->robomas_target_pubs[4]->publish(make_target_frame(high_position));
 						break;
 				}
+				rclcpp::sleep_for(1ms);
 			});
-			rclcpp::sleep_for(10ms);
 		}
 	};
 }
