@@ -102,19 +102,19 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 					case Rotation::stop:
 						for(size_t i = 0; i < 3; ++i) {
 							this->robomas_target_pubs[i]->publish(make_target_frame(0.0f));
-							rclcpp::sleep_for(1ms);
+							rclcpp::sleep_for(10ms);
 						}
 						break;
 					case Rotation::cw:
 						for(size_t i = 0; i < 3; ++i) {
 							this->robomas_target_pubs[i]->publish(make_target_frame(this->cw_speeds[i]));
-							rclcpp::sleep_for(1ms);
+							rclcpp::sleep_for(10ms);
 						}
 						break;
 					case Rotation::ccw:
 						for(size_t i = 0; i < 3; ++i) {
 							this->robomas_target_pubs[i]->publish(make_target_frame(-this->ccw_speeds[i]));
-							rclcpp::sleep_for(1ms);
+							rclcpp::sleep_for(10ms);
 						}
 						break;
 				}
@@ -130,7 +130,7 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 						this->robomas_target_pubs[3]->publish(make_target_frame(-this->ccw_speeds[3]));
 						break;
 				}
-				rclcpp::sleep_for(1ms);
+				rclcpp::sleep_for(10ms);
 
 				switch(this->lift) {
 					case Lift::down:
@@ -141,7 +141,7 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 						break;
 				}
 			});
-			rclcpp::sleep_for(1ms);
+			rclcpp::sleep_for(10ms);
 		}
 	};
 }
