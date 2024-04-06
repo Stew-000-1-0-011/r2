@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <shared_mutex>
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -9,11 +10,13 @@
 #include <sensor_msgs/msg/joy.hpp>
 #include <robomas_plugins/msg/robomas_target.hpp>
 
+#include <my_include/mutexed.hpp>
 #include "logicool.hpp"
 #include "robomasu.hpp"
 
 namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 	using namespace std::chrono_literals;
+	using mutexed::Mutexed;
 	using logicool::Axes;
 	using logicool::Buttons;
 	using robomasu::make_target_frame;
@@ -30,6 +33,8 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 	};
 
 	class CollectDebugNode final : public rclcpp::Node {
+		std::shared_mutex speeds_mtx{};
+		std::shared_mutex rotate_mtx{};
 		std::array<float, 4> cw_speeds{1000.0f, 1000.0f, 1000.0f, 1000.0f};
 		std::array<float, 4> ccw_speeds{1000.0f, 1000.0f, 1000.0f, 1000.0f};
 		float low_position{0.0f};
@@ -55,6 +60,8 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 				return pubs;
 			}())
 			, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) {
+				std::lock_guard lock(this->rotate_mtx);
+
 				if(msg->buttons[Buttons::lb]) {
 					this->collect = Rotation::cw;
 				} else if(msg->buttons[Buttons::rb]) {
@@ -78,6 +85,8 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 				}
 			}))
 			, cw_subs([this]() -> std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> {
+				std::lock_guard lock(this->speeds_mtx);
+
 				std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> subs{};
 				for(size_t i = 0; i < 4; ++i) {
 					subs[i] = this->create_subscription<std_msgs::msg::Float32>("cw_speed" + std::to_string(i), 10, [this, i](const std_msgs::msg::Float32::SharedPtr msg) {
@@ -88,6 +97,8 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 				return subs;
 			}())
 			, ccw_subs([this]() -> std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> {
+				std::lock_guard lock(this->speeds_mtx);
+
 				std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> subs{};
 				for(size_t i = 0; i < subs.size(); ++i) {
 					subs[i] = this->create_subscription<std_msgs::msg::Float32>("ccw_speed" + std::to_string(i), 10, [this, i](const std_msgs::msg::Float32::SharedPtr msg) {
@@ -98,6 +109,10 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 			}())
 		{
 			this->timer = this->create_wall_timer(10ms, [this] {
+				std::shared_lock lock(this->rotate_mtx);
+				std::shared_lock lock2(this->speeds_mtx);
+
+
 				switch(this->collect) {
 					case Rotation::stop:
 						for(size_t i = 0; i < 3; ++i) {
