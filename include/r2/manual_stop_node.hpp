@@ -39,7 +39,7 @@ namespace nhk24_2nd_ws::r2::manual_stop_node::impl {
 						rclcpp::sleep_for(10ms);
 					}
 
-					can_pub->publish(change_mode_frame((u8)(1 << 7)));
+					can_pub->publish(change_mode_frame(false));
 
 					for(u32 i = 0; i < 5; ++i) {
 						robomas_pub->publish(make_param_frame(i, Mode::Disable));
@@ -56,7 +56,7 @@ namespace nhk24_2nd_ws::r2::manual_stop_node::impl {
 						rclcpp::sleep_for(10ms);
 					}
 
-					can_pub->publish(change_mode_frame(0));
+					can_pub->publish(change_mode_frame(true));
 
 					robomas_pub->publish(make_param_frame(4, Mode::Position));
 				}

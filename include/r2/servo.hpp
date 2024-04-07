@@ -7,14 +7,14 @@
 #include <my_include/std_types.hpp>
 
 namespace nhk24_2nd_ws::r2::servo {
-	inline auto change_mode_frame(const u8 bits) -> can_plugins2::msg::Frame {
+	inline auto change_mode_frame(const bool is_activate) -> can_plugins2::msg::Frame {
 		can_plugins2::msg::Frame ret{};
 		ret.is_rtr = false;
 		ret.is_extended = false;
 		ret.is_error = false;
 		ret.dlc = 1;
 		ret.id = 0x300;
-		ret.data[0] = bits;
+		ret.data[0] = is_activate;
 		return ret;
 	}
 

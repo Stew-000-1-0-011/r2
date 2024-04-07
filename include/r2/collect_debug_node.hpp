@@ -44,17 +44,15 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 	};
 
 	class CollectDebugNode final : public rclcpp::Node {
-		std::shared_mutex speeds_mtx{};
-		std::shared_mutex rotate_mtx{};
-		std::array<float, 4> cw_speeds{1000.0f, 1000.0f, 1000.0f, 1000.0f};
-		std::array<float, 4> ccw_speeds{1000.0f, 1000.0f, 1000.0f, 1000.0f};
-		float low_position{0.0f};
-		float high_position{2300.0f};
-		std::array<u16, 2> servo_angles{0, 59999};
-		Rotation collect{Rotation::stop};
-		Rotation load{Rotation::stop};
-		Lift lift{Lift::down};
-		Servo servo{Servo::close};
+		Mutexed<std::array<float, 4>> cw_speeds{Mutexed<std::array<float, 4>>::make({1000.0f, 1000.0f, 1000.0f, 1000.0f})};
+		Mutexed<std::array<float, 4>> ccw_speeds{Mutexed<std::array<float, 4>>::make({1000.0f, 1000.0f, 1000.0f, 1000.0f})};
+		Mutexed<float> low_position{Mutexed<float>::make(0.0f)};
+		Mutexed<float> high_position{Mutexed<float>::make(2300.0f)};
+		Mutexed<std::array<u16, 2>> servo_angles{Mutexed<std::array<u16, 2>>::make({20000, 50000})};
+		Mutexed<Rotation> collect{Mutexed<Rotation>::make(Rotation::stop)};
+		Mutexed<Rotation> load{Mutexed<Rotation>::make(Rotation::stop)};
+		Mutexed<Lift> lift{Mutexed<Lift>::make(Lift::down)};
+		Mutexed<Servo> servo{Mutexed<Servo>::make(Servo::close)};
 
 		std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 5> robomas_target_pubs;
 		rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx;
@@ -76,42 +74,40 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 			}())
 			, can_tx(this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10))
 			, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) {
-				std::lock_guard lock(this->rotate_mtx);
-
 				if(msg->buttons[Buttons::lb]) {
-					this->collect = Rotation::cw;
+					this->collect.set(Rotation::cw);
 				} else if(msg->buttons[Buttons::rb]) {
-					this->collect = Rotation::ccw;
+					this->collect.set(Rotation::ccw);
 				} else {
-					this->collect = Rotation::stop;
+					this->collect.set(Rotation::stop);
 				}
 
 				if(msg->buttons[Buttons::x]) {
-					this->load = Rotation::cw;
+					this->load.set(Rotation::cw);
 				} else if(msg->buttons[Buttons::y]) {
-					this->load = Rotation::ccw;
+					this->load.set(Rotation::ccw);
 				} else {
-					this->load = Rotation::stop;
+					this->load.set(Rotation::stop);
 				}
 				
 				if(msg->axes[Axes::cross_UD] > 0.5) {
-					this->lift = Lift::up;
+					this->lift.set(Lift::up);
 				} else if(msg->axes[Axes::cross_UD] < -0.5) {
-					this->lift = Lift::down;
+					this->lift.set(Lift::down);
 				}
 
 				if(msg->axes[Axes::cross_LR] > 0.5) {
-					this->servo = Servo::close;
+					this->servo.set(Servo::close);
 				} else if(msg->axes[Axes::cross_LR] < -0.5) {
-					this->servo = Servo::open;
+					this->servo.set(Servo::open);
 				}
 			}))
 			, cw_subs([this]() -> std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> {
 				std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> subs{};
 				for(size_t i = 0; i < 4; ++i) {
 					subs[i] = this->create_subscription<std_msgs::msg::Float32>("cw_speed" + std::to_string(i), 10, [this, i](const std_msgs::msg::Float32::SharedPtr msg) {
-						std::lock_guard lock(this->speeds_mtx);
-						this->cw_speeds[i] = msg->data;
+						const auto data = msg->data;
+						this->cw_speeds.modify([i, data](auto& cw_speeds){cw_speeds[i] = data;});
 					});
 				}
 
@@ -121,8 +117,8 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 				std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> subs{};
 				for(size_t i = 0; i < subs.size(); ++i) {
 					subs[i] = this->create_subscription<std_msgs::msg::Float32>("ccw_speed" + std::to_string(i), 10, [this, i](const std_msgs::msg::Float32::SharedPtr msg) {
-						std::lock_guard lock(this->speeds_mtx);
-						this->ccw_speeds[i] = msg->data;
+						const auto data = msg->data;
+						this->ccw_speeds.modify([i, data](auto& ccw_speeds){ccw_speeds[i] = data;});
 					});
 				}
 				return subs;
@@ -130,22 +126,19 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 			, servo_subs([this]() -> std::array<rclcpp::Subscription<std_msgs::msg::UInt16>::SharedPtr, 2> {
 				std::array<rclcpp::Subscription<std_msgs::msg::UInt16>::SharedPtr, 2> subs{};
 				subs[0] = this->create_subscription<std_msgs::msg::UInt16>("servo_close", 10, [this](const std_msgs::msg::UInt16::SharedPtr msg) {
-					std::lock_guard lock(this->speeds_mtx);
-					this->servo_angles[0] = msg->data;
+					const auto data = msg->data;
+					this->servo_angles.modify([data](auto& servo_angles){servo_angles[0] = data;});
 				});
 				subs[1] = this->create_subscription<std_msgs::msg::UInt16>("servo_open", 10, [this](const std_msgs::msg::UInt16::SharedPtr msg) {
-					std::lock_guard lock(this->speeds_mtx);
-					this->servo_angles[1] = msg->data;
+					const auto data = msg->data;
+					this->servo_angles.modify([data](auto& servo_angles){servo_angles[1] = data;});
 				});
 				return subs;
 			}())
 		{
-			this->timer = this->create_wall_timer(10ms, [this] {
+			this->timer = this->create_wall_timer(50ms, [this] {
 				const auto [collect, load, lift, servo, cw_speeds, ccw_speeds, servo_angles] = [this]() -> std::tuple<Rotation, Rotation, Lift, Servo, std::array<float, 4>, std::array<float, 4>, std::array<u16, 2>> {
-					std::shared_lock lock(this->rotate_mtx);
-					std::shared_lock lock2(this->speeds_mtx);
-
-					return {this->collect, this->load, this->lift, this->servo, this->cw_speeds, this->ccw_speeds, this->servo_angles};
+					return {this->collect.get(), this->load.get(), this->lift.get(), this->servo.get(), this->cw_speeds.get(), this->ccw_speeds.get(), this->servo_angles.get()};  // fmapほしい！！
 				}();
 
 				switch(collect) {
@@ -184,20 +177,20 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 
 				switch(lift) {
 					case Lift::down:
-						this->robomas_target_pubs[4]->publish(make_target_frame(low_position));
+						this->robomas_target_pubs[4]->publish(make_target_frame(this->low_position.get()));
 						break;
 					case Lift::up:
-						this->robomas_target_pubs[4]->publish(make_target_frame(high_position));
+						this->robomas_target_pubs[4]->publish(make_target_frame(this->high_position.get()));
 						break;
 				}
 				rclcpp::sleep_for(1ms);
 
 				switch(servo) {
 					case Servo::close:
-						this->can_tx->publish(change_targets03_frame((u64)servo_angles[0] << 8 * 6));  // サイズでdlcが決まるので注意
+						this->can_tx->publish(change_targets03_frame((u64)servo_angles[0]));  // サイズでdlcが決まるので注意
 						break;
 					case Servo::open:
-						this->can_tx->publish(change_targets03_frame((u64)servo_angles[1] << 8 * 6));  // 同上
+						this->can_tx->publish(change_targets03_frame((u64)servo_angles[1]));  // 同上
 						break;
 				}
 			});
