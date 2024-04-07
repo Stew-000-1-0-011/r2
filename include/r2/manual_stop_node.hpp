@@ -10,6 +10,7 @@
 
 #include "shirasu.hpp"
 #include "robomasu.hpp"
+#include "servo.hpp"
 #include "logicool.hpp"
 #include "robot_config.hpp"
 
@@ -19,6 +20,7 @@ namespace nhk24_2nd_ws::r2::manual_stop_node::impl {
 	using shirasu::command_frame;
 	using robomasu::Mode;
 	using robomasu::make_param_frame;
+	using servo::change_mode_frame;
 	using logicool::Buttons;
 
 	struct ManualStopNode final : rclcpp::Node {
@@ -37,6 +39,8 @@ namespace nhk24_2nd_ws::r2::manual_stop_node::impl {
 						rclcpp::sleep_for(10ms);
 					}
 
+					can_pub->publish(change_mode_frame((u8)(1 << 7)));
+
 					for(u32 i = 0; i < 5; ++i) {
 						robomas_pub->publish(make_param_frame(i, Mode::Disable));
 						rclcpp::sleep_for(10ms);
@@ -51,6 +55,8 @@ namespace nhk24_2nd_ws::r2::manual_stop_node::impl {
 						robomas_pub->publish(make_param_frame(i, Mode::Velocity));
 						rclcpp::sleep_for(10ms);
 					}
+
+					can_pub->publish(change_mode_frame(0));
 
 					robomas_pub->publish(make_param_frame(4, Mode::Position));
 				}

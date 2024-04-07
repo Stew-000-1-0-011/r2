@@ -53,14 +53,26 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 			slope_1to2,
 			pass_area2,
 			slope_2to3,
-			dancing
+			dancing,
+			pass_yellow,
+			plunge_ball,
+			collect_ball,
+			back_to_center,
+			goto_silo,
+			harvest
 		};
 
 		using Enum::pass_area1;
 		using Enum::slope_1to2;
 		using Enum::pass_area2;
 		using Enum::slope_2to3;
+		using Enum::pass_yellow;
 		using Enum::dancing;
+		using Enum::plunge_ball;
+		using Enum::collect_ball;
+		using Enum::back_to_center;
+		using Enum::goto_silo;
+		using Enum::harvest;
 
 		static auto from_string(const std::string_view state_name) -> std::optional<Enum> {
 			if(state_name == "pass_area1") {
@@ -71,8 +83,18 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 				return pass_area2;
 			} else if(state_name == "slope_2to3") {
 				return slope_2to3;
-			} else if(state_name == "dancing") {
-				return dancing;
+			} else if (state_name == "pass_yellow") {
+				return pass_yellow;
+			} else if (state_name == "plunge_ball") {
+				return plunge_ball;
+			} else if (state_name == "collect_ball") {
+				return collect_ball;
+			} else if (state_name == "back_to_center") {
+				return back_to_center;
+			} else if (state_name == "goto_silo") {
+				return goto_silo;
+			} else if (state_name == "harvest") {
+				return harvest;
 			} else {
 				return std::nullopt;
 			}
@@ -90,6 +112,12 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 		down
 	};
 
+	enum class Rotation : u8 {
+		stop,
+		cw,
+		ccw
+	};
+
 	struct Io {
 		Mutexed<Xyth> current_pose;
 		Mutexed<Xyth> manual_speed;
@@ -100,6 +128,7 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 
 		Mutexed<Xyth> body_speed;
 		Wanko<LiftState> lift_state;
+
 
 		std::function<auto (const MapName::Enum, const Xyth&) -> std::future<void>> change_map;
 
