@@ -48,7 +48,7 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 		Mutexed<std::array<float, 4>> ccw_speeds{Mutexed<std::array<float, 4>>::make({1000.0f, 1000.0f, 1000.0f, 1000.0f})};
 		Mutexed<float> low_position{Mutexed<float>::make(0.0f)};
 		Mutexed<float> high_position{Mutexed<float>::make(2300.0f)};
-		Mutexed<std::array<u16, 2>> servo_angles{Mutexed<std::array<u16, 2>>::make({20000, 50000})};
+		Mutexed<std::array<u16, 2>> servo_angles{Mutexed<std::array<u16, 2>>::make({50000, 35000})};
 		Mutexed<Rotation> collect{Mutexed<Rotation>::make(Rotation::stop)};
 		Mutexed<Rotation> load{Mutexed<Rotation>::make(Rotation::stop)};
 		Mutexed<Lift> lift{Mutexed<Lift>::make(Lift::down)};

@@ -28,14 +28,15 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 		std::make_optional(0x110)
 		, std::make_optional(0x200)
 		, std::make_optional(0x16c)
-		, std::make_optional(0x210)
+		// , std::make_optional(0x210)
+		, std::nullopt
 	};
 
 	inline constexpr Xy footprint_half_diagonal = Xy::make(0.275, 0.275);  // フットプリントの半対角線長[m]
 
 	inline constexpr double max_v = 500.0 * 0.5;  // モーターの最大速度[rad/s]
 	inline constexpr double max_a = 500.0 * 0.05;  // モーターの最大加速度[rad/s^2]
-	inline constexpr double max_vxy = 1.0;  // 最大並進速度[m/s]
+	inline constexpr double max_vxy = 0.5;  // 最大並進速度[m/s]
 	inline constexpr double max_vth = std::numbers::pi / 3.0 * 0.3;  // 最大角速度[rad/s]
 	inline constexpr double max_axy = 6.0;  // 最大並進加速度[m/s^2]
 	inline constexpr double max_ath = std::numbers::pi / 3.0 * 0.6;  // 最大角加速度[rad/s^2]
