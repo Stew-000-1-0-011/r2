@@ -42,6 +42,15 @@ namespace nhk24_2nd_ws::r2::ros2_utils::impl {
 		return pose;
 	}
 
+	inline auto xyth_to_transform(const Xyth& xyth) -> tf2::Transform {
+		tf2::Transform transform{};
+		transform.setOrigin(tf2::Vector3{xyth.xy.x, xyth.xy.y, 0});
+		tf2::Quaternion q{};
+		q.setRPY(0, 0, xyth.th);
+		transform.setRotation(q);
+		return transform;
+	}
+
 	inline auto get_system_timepoint(rclcpp::Clock& clock) -> std::chrono::system_clock::time_point {
 		return std::chrono::system_clock::time_point{std::chrono::system_clock::duration{clock.now().nanoseconds()}};
 	}
@@ -50,5 +59,6 @@ namespace nhk24_2nd_ws::r2::ros2_utils::impl {
 namespace nhk24_2nd_ws::r2::ros2_utils {
 	using nhk24_2nd_ws::r2::ros2_utils::impl::get_pose;
 	using nhk24_2nd_ws::r2::ros2_utils::impl::xyth_to_pose_msg;
+	using nhk24_2nd_ws::r2::ros2_utils::impl::xyth_to_transform;
 	using nhk24_2nd_ws::r2::ros2_utils::impl::get_system_timepoint;
 }

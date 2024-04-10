@@ -89,6 +89,17 @@ ament_target_dependencies(collect_debug_node
   nav2_amcl
 )
 
+#
+add_executable(silo_position_publish_node
+  src/silo_position_publish_node.cpp
+)
+ament_target_dependencies(silo_position_publish_node
+  rclcpp
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+)
+
 # 
 add_executable(hoge_node
   src/hoge.cpp
@@ -112,6 +123,7 @@ install(
     r2_node  #
     filter_node  #
     collect_debug_node  #
+    silo_position_publish_node  #
     hoge_node  #
   DESTINATION lib/${PROJECT_NAME}
 )

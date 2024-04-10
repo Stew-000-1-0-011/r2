@@ -54,6 +54,14 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 	inline constexpr Xyth area2_initialpose = Xyth::make(Xy::make(5.375, 0.400), 0.0);  // エリア2の坂越え後の初期位置
 	inline constexpr Xyth yellow_initialpose = Xyth::make(Xy::make(1.525, 0.400), 0.0);  // エリア3の坂越え後の初期位置
 	inline constexpr Xyth storage_entry_point = Xyth::make(Xy::make(1.705, 2.0), -std::numbers::pi / 2.0);  // エリア3のストレージゾーンの出入り位置
+
+	inline constexpr std::array<Xyth, 5> silo_positions = {
+		Xyth::make(Xy::make(-0.125, 0.5), 0.0)
+		, Xyth::make(Xy::make(-0.125, 1.25), 0.0)
+		, Xyth::make(Xy::make(-0.125, 2.5), 0.0)
+		, Xyth::make(Xy::make(-0.125, 3.25), 0.0)
+		, Xyth::make(Xy::make(-0.125, 4.5), 0.0)
+	};
 }
 
 namespace nhk24_2nd_ws::r2::robot_config {
@@ -78,5 +86,6 @@ namespace nhk24_2nd_ws::r2::robot_config {
 	using impl::area2_initialpose;
 	using impl::yellow_initialpose;
 	using impl::storage_entry_point;
+	using impl::silo_positions;
 }
 
