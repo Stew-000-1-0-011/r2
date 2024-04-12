@@ -28,8 +28,7 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 		std::make_optional(0x110)
 		, std::make_optional(0x200)
 		, std::make_optional(0x16c)
-		// , std::make_optional(0x210)
-		, std::nullopt
+		, std::make_optional(0x210)
 	};
 
 	inline constexpr Xy footprint_half_diagonal = Xy::make(0.275, 0.275);  // フットプリントの半対角線長[m]
