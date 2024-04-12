@@ -26,6 +26,7 @@ find_package(nav2_msgs REQUIRED)  #
 find_package(can_plugins2 REQUIRED)  #
 find_package(robomas_plugins REQUIRED)  #
 find_package(nav2_amcl REQUIRED)  #
+find_package(nhk24_utils REQUIRED)  #
 
 #
 include_directories(
@@ -50,6 +51,7 @@ ament_target_dependencies(r2_node
   sensor_msgs
   can_plugins2
   robomas_plugins
+  nhk24_utils
 )
 
 # 

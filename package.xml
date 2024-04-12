@@ -24,6 +24,7 @@
   <depend>can_plugins2</depend>
   <depend>robomas_plugins</depend>
   <depend>nav2_amcl</depend>
+  <depend>nhk24_utils</depend>
 
   <exec_depend>rosidl_default_runtime</exec_depend>
   <exec_depend>rviz</exec_depend>

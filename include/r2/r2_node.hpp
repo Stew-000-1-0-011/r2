@@ -33,6 +33,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <lifecycle_msgs/srv/change_state.hpp>
 #include <nav2_msgs/srv/load_map.hpp>
+#include <nhk24_utils/msg/balls.hpp>
 
 #include <my_include/void.hpp>
 #include <my_include/xyth.hpp>
@@ -40,6 +41,8 @@
 #include <my_include/sum_last_n.hpp>
 #include <my_include/operator_generator.hpp>
 #include <my_include/mutexed.hpp>
+
+#include <nhk24_utils/vec3d.hpp>
 
 #include "geometry_msgs_convertor.hpp"
 #include "robot_config.hpp"
@@ -61,6 +64,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using sum_last_n::SumLastN;
 	using operator_generator::BinaryLeftOp;
 	using mutexed::Mutexed;
+	using nhk24_utils::stew::vec3d::Vec3d;
 
 	using robot_io::Io;
 	using robot_io::MapName;
@@ -101,6 +105,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
 			// 本当はサービスにすべきだが、サービスを作るのめんどいので...
 			rclcpp::Subscription<std_msgs::msg::String>::SharedPtr manual_recover_state_sub;
+			rclcpp::Subscription<nhk24_utils::msg::Balls>::SharedPtr balls_sub;
 
 			rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr map_server_change_state_client;
 			rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr amcl_change_state_client;
@@ -145,6 +150,11 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 						}
 					}
 				))
+				, balls_sub(this->create_subscription<nhk24_utils::msg::Balls>("balls", 1,
+					[this](const nhk24_utils::msg::Balls::SharedPtr balls) {
+						this->balls_callback(std::move(*balls));
+					}
+				))
 				, map_server_change_state_client(this->create_client<lifecycle_msgs::srv::ChangeState>("map_server/change_state"))
 				, amcl_change_state_client(this->create_client<lifecycle_msgs::srv::ChangeState>("amcl/change_state"))
 				, load_map_client(this->create_client<nav2_msgs::srv::LoadMap>("map_server/load_map"))
@@ -178,6 +188,29 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					)
 					, joy.axes[Axes::r_stick_LR] * robot_config::max_vth
 				));
+			}
+
+			void balls_callback(nhk24_utils::msg::Balls&& balls) {
+				if(balls.balls.empty()) {
+					this->io->ball_direction.set(std::nullopt);
+				}
+				else {
+					constexpr auto calc_direction = [](const nhk24_utils::msg::Ball& ball) -> double {
+						const auto v = Vec3d::from_msg<geometry_msgs::msg::Point>(ball.position);
+						return std::atan2(v.y, v.x);
+					};
+
+					const double last_direction = this->io->ball_direction.get().value_or(0.0);
+					double direction = calc_direction(balls.balls[0]);
+					for(const auto& ball : balls.balls) {
+						const double d = calc_direction(ball);
+						if(std::abs(d - last_direction) < std::abs(direction - last_direction)) {
+							direction = d;
+						}
+					}
+
+					this->io->ball_direction.set(direction);
+				}
 			}
 
 			void timer_callback() {

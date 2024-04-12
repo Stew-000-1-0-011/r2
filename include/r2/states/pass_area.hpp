@@ -154,4 +154,21 @@ namespace nhk24_2nd_ws::r2::transit_state {
 			);
 		}
 	}
+
+	inline auto to_plunge_balls() -> std::unique_ptr<StateBase> {
+		using namespace pass_area::impl;
+
+		auto path = PathName::load_path(PathName::storage_into_center);
+		if(!path.has_value()) {
+			return to_error_state(std::string("Failed to load path: ") + path.error());
+		}
+		else {
+			return to_pass_area (
+				MapName::area3_storage
+				, robot_config::storage_entry_point
+				, std::move(*path)
+				, to_collect_ball
+			);
+		}
+	}
 }
