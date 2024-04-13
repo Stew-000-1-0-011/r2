@@ -59,6 +59,8 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using void_::Void;
 	using xyth::Xy;
 	using xyth::Xyth;
+	using xyth::XythScalar;
+	using xyth::XythOp;
 	using xyth::XyOp;
 	using debug_print::printlns;
 	using sum_last_n::SumLastN;
@@ -93,6 +95,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			Io * io;
 			Omni4 omni4;
 			Mutexed<SumLastN<Xyth, XythLinear>> current_pose_sum;
+			Mutexed<Xyth> last_true_odompose;
 
 			tf2_ros::TransformBroadcaster tf2_broadcaster;
 			tf2_ros::Buffer tf2_buffer;
@@ -224,6 +227,18 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					this->io->current_pose.set(current_pose_average);
 				}
 				// printlns("current_pose: ", this->io->current_pose.get());
+
+				const auto true_odompose = get_pose(this->tf2_buffer, "odom", "true_base_link");
+				if(true_odompose.has_value()) {
+					const auto last_pose = this->last_true_odompose.modify(
+						[true_odompose](auto& last) {
+							const auto last_pose = last;
+							last = *true_odompose;
+							return last_pose;
+						}
+					);
+					io->current_speed.set((*true_odompose -XythOp{}- last_pose) /XythOp{}/ XythScalar::from(0.01));
+				}
 
 				// output
 				const auto body_speed = this->io->body_speed.get();

@@ -23,6 +23,7 @@
 namespace nhk24_2nd_ws::r2::pass_area::impl {
 	using namespace std::chrono_literals;
 	using xyth::Xyth;
+	using xyth::XythScalar;
 	using state_machine::make_state;
 	using debug_print::printlns;
 	using path_parser::PathName;
@@ -30,6 +31,7 @@ namespace nhk24_2nd_ws::r2::pass_area::impl {
 	using robot_io::ManualAuto;
 	using robot_io::MapName;
 	using pacman::Pacman;
+	using pacman::XythPid;
 	using transit_state::StateBase;
 	using transit_state::to_error_state;
 	using transit_state::to_manual;
@@ -60,8 +62,11 @@ namespace nhk24_2nd_ws::r2::pass_area::impl {
 				return PassArea {
 					Pacman::make (
 						std::move(path)
-						, XyPid::make(1.0, 0.0, 1.0)
-						, ThPid::make(1.0, 0.0, 1.0)
+						, XythPid::make (
+							XythScalar::from(0.1)
+							, XythScalar::from(0.0)
+							, XythScalar::from(1.0)
+						)
 					)
 					, map
 					, initialpose
@@ -76,11 +81,12 @@ namespace nhk24_2nd_ws::r2::pass_area::impl {
 				}
 				, [nsg = std::move(nsg)](PassArea& pa, Io& io) mutable -> std::optional<std::unique_ptr<StateBase>> {
 					const auto current_pose = io.current_pose.get();
+					const auto current_speed = io.current_speed.get();
 
 					const auto [body_speed, is_reached] = pa.pacman.update (
 						current_pose
-						, 0.1
-						, 0.25
+						, current_speed
+						, XythScalar::make(0.1, 0.25)
 					);
 					
 					
@@ -168,6 +174,23 @@ namespace nhk24_2nd_ws::r2::transit_state {
 				, robot_config::storage_entry_point
 				, std::move(*path)
 				, to_collect_ball
+			);
+		}
+	}
+
+	inline auto to_exit_storage() -> std::unique_ptr<StateBase> {
+		using namespace pass_area::impl;
+
+		auto path = PathName::load_path(PathName::center_to_exit);
+		if(!path.has_value()) {
+			return to_error_state(std::string("Failed to load path: ") + path.error());
+		}
+		else {
+			return to_pass_area (
+				MapName::area3_storage
+				, robot_config::storage_entry_point
+				, std::move(*path)
+				, to_dancing
 			);
 		}
 	}

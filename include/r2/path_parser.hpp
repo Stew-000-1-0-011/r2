@@ -54,12 +54,14 @@ namespace nhk24_2nd_ws::r2::path_parser::impl {
 			, area2_to_yellow
 			, yellow_to_storage
 			, storage_into_center
+			, center_to_exit
 		};
 
 		using Enum::start_to_area2;
 		using Enum::area2_to_yellow;
 		using Enum::yellow_to_storage;
 		using Enum::storage_into_center;
+		using Enum::center_to_exit;
 
 		static auto load_path(const Enum path_name) -> std::expected<std::vector<Xyth>, std::string> {
 			std::string_view path_file{};
