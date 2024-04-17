@@ -156,12 +156,12 @@ namespace nhk24_2nd_ws::r2::transit_state {
 				MapName::area3_yellow
 				, robot_config::yellow_initialpose
 				, std::move(*path)
-				, to_plunge_balls
+				, to_plunge_ball
 			);
 		}
 	}
 
-	inline auto to_plunge_balls() -> std::unique_ptr<StateBase> {
+	inline auto to_plunge_ball() -> std::unique_ptr<StateBase> {
 		using namespace pass_area::impl;
 
 		auto path = PathName::load_path(PathName::storage_into_center);

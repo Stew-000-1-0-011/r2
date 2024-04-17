@@ -26,6 +26,9 @@ namespace nhk24_2nd_ws::r2::temporary_manual::impl {
 	using transit_state::to_pass_area2;
 	using transit_state::to_slope_2to3;
 	using transit_state::to_dancing;
+	using transit_state::to_pass_yellow;
+	using transit_state::to_plunge_ball;
+	using transit_state::to_collect_ball;
 
 	struct TemporaryManual final {};
 
@@ -46,6 +49,12 @@ namespace nhk24_2nd_ws::r2::temporary_manual::impl {
 								return to_slope_2to3();
 							case StateName::dancing:
 								return to_dancing();
+							case StateName::pass_yellow:
+								return to_pass_yellow();
+							case StateName::plunge_ball:
+								return to_plunge_ball();
+							case StateName::collect_ball:
+							return to_collect_ball();
 							default:
 								return nullptr;
 						}

@@ -46,7 +46,7 @@ namespace nhk24_2nd_ws::r2::transit_state {
 
 					if(not direction.has_value() || not in_safety_area(current_pose)) {
 						if(cb.assume_lost.update() > 0.5s) {
-							return to_manual(to_plunge_balls());
+							return to_manual(to_plunge_ball());
 						}
 					} else {
 						cb.assume_lost.reset();
