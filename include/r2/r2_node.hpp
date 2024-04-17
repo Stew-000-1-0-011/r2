@@ -265,17 +265,17 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					this->current_pose_sum.modify([](auto& sum) {
 						sum.clear();
 					});
-					io->busy_loop([this]() -> std::optional<Void> {
-						// amclを非アクティブ状態にする
-						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
-						if(this->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
+					// io->busy_loop([this]() -> std::optional<Void> {
+					// 	// amclを非アクティブ状態にする
+					// 	auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+					// 	req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
+					// 	if(this->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
+					// 		return Void{};
+					// 	}
+					// 	return std::nullopt;
+					// });
 
-					printlns("amcl is deactivated.");
+					// printlns("amcl is deactivated.");
 				}
 				
 				{
@@ -317,19 +317,19 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					printlns("initial_pose is set.");
 				}
 
-				{
-					io->busy_loop([this]() -> std::optional<Void> {
-						// amclをアクティブ状態にする
-						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
-						if(this->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
+				// {
+				// 	io->busy_loop([this]() -> std::optional<Void> {
+				// 		// amclをアクティブ状態にする
+				// 		auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
+				// 		req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
+				// 		if(this->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
+				// 			return Void{};
+				// 		}
+				// 		return std::nullopt;
+				// 	});
 
-					printlns("amcl is activated.");
-				}
+				// 	printlns("amcl is activated.");
+				// }
 			}
 
 			void kill() {
