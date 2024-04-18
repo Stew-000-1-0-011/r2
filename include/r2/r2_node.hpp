@@ -201,7 +201,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				else {
 					constexpr auto calc_direction = [](const nhk24_utils::msg::Ball& ball) -> double {
 						const auto v = Vec3d::from_msg<geometry_msgs::msg::Point>(ball.position);
-						return std::atan2(v.z, v.x);
+						return std::atan2(v.x, v.z);
 					};
 
 					const double last_direction = this->io->ball_direction.get().value_or(0.0);

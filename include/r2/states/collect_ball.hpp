@@ -75,17 +75,17 @@ namespace nhk24_2nd_ws::r2::transit_state {
 						cb.assume_lost.reset();
 
 						const auto rotation_speed = cb.pid.update_with_derivative (
-							*direction - 0.0
+							0.0 - *direction
 							, current_speed.th
 							, cb.dt.update().count()
 						);
 
-						// io.body_speed.set (
-						// 	xyth::Xyth::make (
-						// 		xyth::Xy::make(0.0, 0.0)
-						// 		, rotation_speed
-						// 	)
-						// );
+						io.body_speed.set (
+							xyth::Xyth::make (
+								xyth::Xy::make(0.0, 0.1)
+								, rotation_speed
+							)
+						);
 					}
 
 					if(io.ball_collected_correctly.get()) {
