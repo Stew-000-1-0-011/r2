@@ -29,11 +29,12 @@ namespace nhk24_2nd_ws::r2::collect_ball::impl {
 	using state_machine::make_state;
 	using debug_print::printlns;
 	using robot_io::Io;
+	using robot_io::ManualAuto;
 	using lap_timer::LapTimer;
 	using lap_timer::LapTimer;
 
 	struct CollectBall final {
-		Pid<double> pid{Pid<double>::make(1.0, 0.0, 0.0)};
+		Pid<double> pid{Pid<double>::make(0.3, 0.0, 0.0)};
 		LapTimer dt{LapTimer::make()};
 		LapTimer assume_lost{LapTimer::make()};
 	};
@@ -52,16 +53,22 @@ namespace nhk24_2nd_ws::r2::transit_state {
 				return {};
 			}
 			, std::tuple {
-				[](CollectBall& cb, Io& io) -> std::optional<std::unique_ptr<StateBase>> {
+				[](CollectBall&, Io& io) -> std::optional<std::unique_ptr<StateBase>> {
+					if(const auto manual_auto = io.change_manual_auto.get(); manual_auto.has_value() && *manual_auto == ManualAuto::manual){
+						return to_manual(to_collect_ball());
+					}
+					return std::nullopt;
+				}
+				, [](CollectBall& cb, Io& io) -> std::optional<std::unique_ptr<StateBase>> {
 					const auto current_pose = io.current_pose.get();
 					const auto current_speed = io.current_speed.get();
 					const auto direction = io.ball_direction.get();
 
-					printlns("in collect ball.", __LINE__);
+					printlns("direction: ", direction);
+
 
 					if(not direction.has_value() || not in_safety_area(current_pose)) {
 						if(cb.assume_lost.update() > 0.5s) {
-							printlns("in collect ball.", __LINE__);
 							return to_manual(to_plunge_balls());
 						}
 					} else {
@@ -73,20 +80,18 @@ namespace nhk24_2nd_ws::r2::transit_state {
 							, cb.dt.update().count()
 						);
 
-						io.body_speed.set (
-							xyth::Xyth::make (
-								xyth::Xy::make(0.0, 1.0)
-								, rotation_speed
-							)
-						);
+						// io.body_speed.set (
+						// 	xyth::Xyth::make (
+						// 		xyth::Xy::make(0.0, 0.0)
+						// 		, rotation_speed
+						// 	)
+						// );
 					}
 
 					if(io.ball_collected_correctly.get()) {
-						printlns("in collect ball.", __LINE__);
 						return to_manual(to_exit_storage());
 					}
 
-					printlns("in collect ball.", __LINE__);
 					return std::nullopt;
 				}
 			}
