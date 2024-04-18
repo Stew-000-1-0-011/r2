@@ -31,7 +31,7 @@ namespace nhk24_2nd_ws::r2::temporary_manual::impl {
 	using transit_state::to_collect_ball;
 	using transit_state::to_dancing;
 	using transit_state::to_pass_yellow;
-	using transit_state::to_plunge_ball;
+	using transit_state::to_plunge_balls;
 	using transit_state::to_collect_ball;
 
 	struct TemporaryManual final {};

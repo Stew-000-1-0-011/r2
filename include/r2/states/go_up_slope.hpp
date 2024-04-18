@@ -60,6 +60,6 @@ namespace nhk24_2nd_ws::r2::transit_state {
 
 	inline auto to_slope_YtoS() -> std::unique_ptr<StateBase> {
 		using namespace go_up_slope::impl;
-		return to_go_up_slope(to_plunge_ball, slope_speed);
+		return to_go_up_slope(to_plunge_balls, slope_speed);
 	}
 }

@@ -53,9 +53,10 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 			slope_1to2,
 			pass_area2,
 			slope_2to3,
+			slope_YtoS,
 			dancing,
 			pass_yellow,
-			plunge_ball,
+			plunge_balls,
 			collect_ball,
 			back_to_center,
 			goto_silo,
@@ -66,9 +67,10 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 		using Enum::slope_1to2;
 		using Enum::pass_area2;
 		using Enum::slope_2to3;
+		using Enum::slope_YtoS;
 		using Enum::pass_yellow;
 		using Enum::dancing;
-		using Enum::plunge_ball;
+		using Enum::plunge_balls;
 		using Enum::collect_ball;
 		using Enum::back_to_center;
 		using Enum::goto_silo;
@@ -86,7 +88,7 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 			} else if (state_name == "pass_yellow") {
 				return pass_yellow;
 			} else if (state_name == "plunge_ball") {
-				return plunge_ball;
+				return plunge_balls;
 			} else if (state_name == "collect_ball") {
 				return collect_ball;
 			} else if (state_name == "back_to_center") {
