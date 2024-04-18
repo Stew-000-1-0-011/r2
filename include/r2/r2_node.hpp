@@ -50,7 +50,7 @@
 #include "omni4.hpp"
 #include "logicool.hpp"
 #include "ros2_utils.hpp"
-#include "shirasu.hpp"
+// #include "shirasu.hpp"
 #include "robomasu.hpp"
 
 namespace nhk24_2nd_ws::r2::r2_node::impl {
@@ -76,7 +76,8 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using logicool::Buttons;
 	using logicool::Axes;
 	using ros2_utils::get_pose;
-	using shirasu::target_frame;
+	// using shirasu::target_frame;
+	using robomasu::make_target_frame;
 
 	struct XythLinear final
 		: BinaryLeftOp<"+", +[](const Xyth& lhs, const Xyth& rhs) -> Xyth {
@@ -101,8 +102,8 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			tf2_ros::Buffer tf2_buffer;
 			tf2_ros::TransformListener tf2_listener;
 
-			rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx;
-			// std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> robomas_target_frame_pubs;
+			// rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx;
+			std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> robomas_target_frame_pubs;
 			rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_pub;
 			
 			rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
@@ -126,16 +127,16 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				, tf2_broadcaster{*this}
 				, tf2_buffer{this->get_clock()}
 				, tf2_listener{tf2_buffer}
-				, can_tx{this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10)}
-				// , robomas_target_frame_pubs {
-				// 	[this]() -> std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> {
-				// 		std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> pubs;
-				// 		for(u32 i = 0; i < 5; ++i) {
-				// 			pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target" + std::to_string(i), 10);
-				// 		}
-				// 		return pubs;
-				// 	}()
-				// }
+				// , can_tx{this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10)}
+				, robomas_target_frame_pubs {
+					[this]() -> std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> {
+						std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> pubs;
+						for(u32 i = 0; i < 4; ++i) {
+							pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target2-" + std::to_string(i), 10);
+						}
+						return pubs;
+					}()
+				}
 				, initial_pose_pub{this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 1)}
 				, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 1,
 					[this](const sensor_msgs::msg::Joy::SharedPtr joy) {
@@ -255,7 +256,8 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			void send_motor_speeds(const std::array<double, 4>& speeds) {
 				for(u32 i = 0; i < 4; ++i) {
 					if(const auto id = robot_config::ids[i]; id) {
-						this->can_tx->publish(target_frame(*id, speeds[i]));
+						// this->can_tx->publish(target_frame(*id, speeds[i]));
+						this->robomas_target_frame_pubs[i]->publish(make_target_frame(speeds[i]));
 					}
 				}
 			}
@@ -265,17 +267,6 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					this->current_pose_sum.modify([](auto& sum) {
 						sum.clear();
 					});
-					// io->busy_loop([this]() -> std::optional<Void> {
-					// 	// amclを非アクティブ状態にする
-					// 	auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-					// 	req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
-					// 	if(this->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
-					// 		return Void{};
-					// 	}
-					// 	return std::nullopt;
-					// });
-
-					// printlns("amcl is deactivated.");
 				}
 				
 				{
@@ -316,20 +307,6 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 					printlns("initial_pose is set.");
 				}
-
-				// {
-				// 	io->busy_loop([this]() -> std::optional<Void> {
-				// 		// amclをアクティブ状態にする
-				// 		auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-				// 		req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
-				// 		if(this->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
-				// 			return Void{};
-				// 		}
-				// 		return std::nullopt;
-				// 	});
-
-				// 	printlns("amcl is activated.");
-				// }
 			}
 
 			void kill() {
