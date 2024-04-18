@@ -2,13 +2,13 @@
 
 #include <cstring>
 
-#include <can_plugins2/msg/frame.hpp>
+#include <robomas_plugins/msg/frame.hpp>
 
 #include <my_include/std_types.hpp>
 
 namespace nhk24_2nd_ws::r2::servo {
-	inline auto change_mode_frame(const bool is_activate) -> can_plugins2::msg::Frame {
-		can_plugins2::msg::Frame ret{};
+	inline auto change_mode_frame(const bool is_activate) -> robomas_plugins::msg::Frame {
+		robomas_plugins::msg::Frame ret{};
 		ret.is_rtr = false;
 		ret.is_extended = false;
 		ret.is_error = false;
@@ -18,8 +18,8 @@ namespace nhk24_2nd_ws::r2::servo {
 		return ret;
 	}
 
-	inline auto change_targets03_frame(const u64 targets) -> can_plugins2::msg::Frame {
-		can_plugins2::msg::Frame ret{};
+	inline auto change_targets03_frame(const u64 targets) -> robomas_plugins::msg::Frame {
+		robomas_plugins::msg::Frame ret{};
 		ret.is_rtr = false;
 		ret.is_extended = false;
 		ret.is_error = false;
@@ -29,8 +29,8 @@ namespace nhk24_2nd_ws::r2::servo {
 		return ret;
 	}
 
-	inline auto change_targets47_frame(const u64 targets) -> can_plugins2::msg::Frame {
-		can_plugins2::msg::Frame ret{};
+	inline auto change_targets47_frame(const u64 targets) -> robomas_plugins::msg::Frame {
+		robomas_plugins::msg::Frame ret{};
 		ret.is_rtr = false;
 		ret.is_extended = false;
 		ret.is_error = false;
