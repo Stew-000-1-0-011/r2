@@ -10,7 +10,7 @@
 #include <std_msgs/msg/float32.hpp>
 #include <sensor_msgs/msg/joy.hpp>
 #include <robomas_plugins/msg/robomas_target.hpp>
-#include <can_plugins2/msg/frame.hpp>
+#include <robomas_plugins/msg/frame.hpp>
 
 #include <my_include/std_types.hpp>
 #include <my_include/mutexed.hpp>
@@ -55,7 +55,7 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 		Mutexed<Servo> servo{Mutexed<Servo>::make(Servo::close)};
 
 		std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 5> robomas_target_pubs;
-		rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx;
+		rclcpp::Publisher<robomas_plugins::msg::Frame>::SharedPtr can_tx;
 		rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
 		std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> cw_subs;
 		std::array<rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr, 4> ccw_subs;
@@ -72,7 +72,7 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 				}
 				return pubs;
 			}())
-			, can_tx(this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10))
+			, can_tx(this->create_publisher<robomas_plugins::msg::Frame>("robomas_can_tx", 10))
 			, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) {
 				if(msg->buttons[Buttons::lb]) {
 					this->collect.set(Rotation::cw);
