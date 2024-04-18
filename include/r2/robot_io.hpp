@@ -42,7 +42,7 @@ namespace nhk24_2nd_ws::r2::robot_io::impl {
 				case area2: return "area2";
 				case area3_yellow: return "area3_yellow";
 				case area3_storage: return "area3_storage";
-				default: return "unreachable";
+				default: return "unreachable" __FILE__ ": to_filepath";
 			}
 		}
 	};

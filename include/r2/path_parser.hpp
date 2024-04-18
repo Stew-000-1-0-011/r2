@@ -69,6 +69,8 @@ namespace nhk24_2nd_ws::r2::path_parser::impl {
 				case start_to_area2: path_file = "start_to_area2"; break;
 				case area2_to_yellow: path_file = "area2_to_yellow"; break;
 				case yellow_to_storage: path_file = "yellow_to_storage"; break;
+				case storage_into_center: path_file = "storage_into_center"; break;
+				case center_to_exit: path_file = "center_to_exit"; break;
 				default: path_file = "unreachable";
 			}
 

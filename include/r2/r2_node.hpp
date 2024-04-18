@@ -132,7 +132,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					[this]() -> std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> {
 						std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> pubs;
 						for(u32 i = 0; i < 4; ++i) {
-							pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target2-" + std::to_string(i), 10);
+							pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target2_" + std::to_string(i), 10);
 						}
 						return pubs;
 					}()
@@ -254,12 +254,16 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 
 			void send_motor_speeds(const std::array<double, 4>& speeds) {
-				for(u32 i = 0; i < 4; ++i) {
-					if(const auto id = robot_config::ids[i]; id) {
-						// this->can_tx->publish(target_frame(*id, speeds[i]));
-						this->robomas_target_frame_pubs[i]->publish(make_target_frame(speeds[i]));
-					}
-				}
+				this->robomas_target_frame_pubs[0]->publish(make_target_frame(-speeds[0]));
+				this->robomas_target_frame_pubs[3]->publish(make_target_frame(-speeds[1]));
+				this->robomas_target_frame_pubs[2]->publish(make_target_frame(-speeds[2]));
+				this->robomas_target_frame_pubs[1]->publish(make_target_frame(-speeds[3]));
+				
+				// for(u32 i = 0; i < 4; ++i) {
+				// 	if(const auto id = robot_config::ids[i]; id) {
+				// 		this->can_tx->publish(target_frame(*id, speeds[i]));
+				// 	}
+				// }
 			}
 
 			void change_map(const MapName::Enum filepath, const Xyth& initial_pose) {

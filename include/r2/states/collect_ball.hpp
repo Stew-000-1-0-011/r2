@@ -3,6 +3,7 @@
 #include <my_include/xyth.hpp>
 #include <my_include/pid.hpp>
 #include <my_include/state_machine.hpp>
+#include <my_include/debug_print.hpp>
 
 #include "../robot_io.hpp"
 #include "../lap_timer.hpp"
@@ -26,6 +27,7 @@ namespace nhk24_2nd_ws::r2::collect_ball::impl {
 	using pid::Pid;
 	using state_machine::StateBase;
 	using state_machine::make_state;
+	using debug_print::printlns;
 	using robot_io::Io;
 	using lap_timer::LapTimer;
 	using lap_timer::LapTimer;
@@ -50,13 +52,16 @@ namespace nhk24_2nd_ws::r2::transit_state {
 				return {};
 			}
 			, std::tuple {
-				[](CollectBall& cb, Io& io) -> std::unique_ptr<StateBase> {
+				[](CollectBall& cb, Io& io) -> std::optional<std::unique_ptr<StateBase>> {
 					const auto current_pose = io.current_pose.get();
 					const auto current_speed = io.current_speed.get();
 					const auto direction = io.ball_direction.get();
 
+					printlns("in collect ball.", __LINE__);
+
 					if(not direction.has_value() || not in_safety_area(current_pose)) {
 						if(cb.assume_lost.update() > 0.5s) {
+							printlns("in collect ball.", __LINE__);
 							return to_manual(to_plunge_balls());
 						}
 					} else {
@@ -77,42 +82,12 @@ namespace nhk24_2nd_ws::r2::transit_state {
 					}
 
 					if(io.ball_collected_correctly.get()) {
+						printlns("in collect ball.", __LINE__);
 						return to_manual(to_exit_storage());
 					}
 
-					return nullptr;
-				}
-				, [](CollectBall& cb, Io& io) -> std::unique_ptr<StateBase> {
-					const auto current_pose = io.current_pose.get();
-					const auto current_speed = io.current_speed.get();
-					const auto direction = io.ball_direction.get();
-
-					if(not direction.has_value() || not in_safety_area(current_pose)) {
-						if(cb.assume_lost.update() > 0.5s) {
-							return to_manual(to_plunge_balls());
-						}
-					} else {
-						cb.assume_lost.reset();
-
-						const auto rotation_speed = cb.pid.update_with_derivative (
-							*direction - 0.0
-							, current_speed.th
-							, cb.dt.update().count()
-						);
-
-						io.body_speed.set (
-							xyth::Xyth::make (
-								xyth::Xy::make(0.0, 1.0)
-								, rotation_speed
-							)
-						);
-					}
-
-					if(io.ball_collected_correctly.get()) {
-						return to_manual(to_exit_storage());
-					}
-
-					return nullptr;
+					printlns("in collect ball.", __LINE__);
+					return std::nullopt;
 				}
 			}
 			, 20ms
