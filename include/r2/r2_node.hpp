@@ -5,17 +5,13 @@
 
 #pragma once
 
-#include <cmath>
-#include <atomic>
 #include <utility>
-#include <chrono>
-#include <tuple>
-#include <future>
-#include <array>
-#include <thread>
 #include <optional>
-#include <memory>
+#include <array>
+#include <string>
 #include <string_view>
+#include <cmath>
+#include <chrono>
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -23,35 +19,37 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 
-#include <can_plugins2/msg/frame.hpp>
-#include <robomas_plugins/msg/robomas_frame.hpp>
 #include <robomas_plugins/msg/robomas_target.hpp>
+#include <robomas_plugins/msg/frame.hpp>
 
-#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <sensor_msgs/msg/joy.hpp>
-#include <std_msgs/msg/empty.hpp>
 #include <std_msgs/msg/string.hpp>
-#include <lifecycle_msgs/srv/change_state.hpp>
-#include <nav2_msgs/srv/load_map.hpp>
+#include <std_msgs/msg/u_int8.hpp>
 #include <nhk24_utils/msg/balls.hpp>
 
 #include <my_include/void.hpp>
 #include <my_include/xyth.hpp>
+#include <my_include/std_types.hpp>
 #include <my_include/debug_print.hpp>
-#include <my_include/sum_last_n.hpp>
+// #include <my_include/sum_last_n.hpp>
 #include <my_include/operator_generator.hpp>
 #include <my_include/mutexed.hpp>
+#include <my_include/lap_timer.hpp>
 
 #include <nhk24_utils/vec3d.hpp>
 
 #include "geometry_msgs_convertor.hpp"
 #include "robot_config.hpp"
-#include "robot_io.hpp"
 #include "omni4.hpp"
 #include "logicool.hpp"
 #include "ros2_utils.hpp"
-// #include "shirasu.hpp"
 #include "robomasu.hpp"
+#include "servo.hpp"
+#include "mode.hpp"
+#include "field_constant.hpp"
+#include "r2_controller.hpp"
+
+#include "modes/manual.hpp"
 
 namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using namespace std::chrono_literals;
@@ -60,24 +58,39 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 	using xyth::Xy;
 	using xyth::Xyth;
 	using xyth::XythScalar;
-	using xyth::XythOp;
 	using xyth::XyOp;
-	using debug_print::printlns;
-	using sum_last_n::SumLastN;
+	using xyth::XythOp;
+	using debug_print::printlns_to;
+	// using sum_last_n::SumLastN;
 	using operator_generator::BinaryLeftOp;
 	using mutexed::Mutexed;
+	using lap_timer::LapTimer;
+
 	using nhk24_utils::stew::vec3d::Vec3d;
 
-	using robot_io::Io;
-	using robot_io::MapName;
-	using robot_io::StateName;
-	using robot_io::ManualAuto;
 	using omni4::Omni4;
 	using logicool::Buttons;
 	using logicool::Axes;
 	using ros2_utils::get_pose;
-	// using shirasu::target_frame;
 	using robomasu::make_target_frame;
+	using servo::change_targets03_frame;
+	using mode::ModeName;
+	using mode::ModeArg;
+	using field_constant::SiloIndex;
+	using r2_controller::R2Controller;
+	
+	using modes::pursuit::Area1Start;
+	using modes::pursuit::Area2Start;
+	using modes::pursuit::GotoCenterStorage;
+	using modes::pursuit::GotoSiloWatchPoint;
+	using modes::pursuit::GotoSilo;
+	using modes::pursuit::PursuitIn;
+	using modes::pursuit::PursuitOut;
+	using modes::collect_ball::CollectBall;
+	using modes::watch_silo::WatchSilo;
+	using modes::harvest::Harvest;
+	using modes::manual::Manual;
+	using ModeContinue = Manual::ModeContinue;
 
 	struct XythLinear final
 		: BinaryLeftOp<"+", +[](const Xyth& lhs, const Xyth& rhs) -> Xyth {
@@ -91,333 +104,307 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 		}>
 	{};
 
-	namespace {
-		struct R2Node final : rclcpp::Node {
-			Io * io;
-			Omni4 omni4;
-			Mutexed<SumLastN<Xyth, XythLinear>> current_pose_sum;
-			Mutexed<Xyth> last_true_odompose;
+	struct R2Node final : rclcpp::Node {
+		Mutexed<bool> to_manual;
+		Mutexed<bool> killed;
 
-			tf2_ros::TransformBroadcaster tf2_broadcaster;
-			tf2_ros::Buffer tf2_buffer;
-			tf2_ros::TransformListener tf2_listener;
+		Mutexed<Xyth> current_pose;
+		Mutexed<Xyth> current_speed;
+		Mutexed<std::optional<double>> ball_direction;
+		Mutexed<double> forward_speed;
+		Mutexed<bool> collected_correctly;
+		Mutexed<std::optional<SiloIndex::Enum>> target_silo;
+		Mutexed<Xyth> manual_speed;
+		Mutexed<std::optional<std::variant<ModeContinue, ModeName::Enum>>> change_to_auto;
+		
+		Mutexed<Xyth> target_speed;
+		Mutexed<bool> servo_open;
 
-			// rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx;
-			std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> robomas_target_frame_pubs;
-			rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_pub;
-			
-			rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
-			// 本当はサービスにすべきだが、サービスを作るのめんどいので...
-			rclcpp::Subscription<std_msgs::msg::String>::SharedPtr manual_recover_state_sub;
-			rclcpp::Subscription<nhk24_utils::msg::Balls>::SharedPtr balls_sub;
+		LapTimer dt_timer;
+		Omni4 omni4;
+		Mutexed<Xyth> last_odompose;
+		Mutexed<std::optional<ModeName::Enum>> recover_mode;
 
-			rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr map_server_change_state_client;
-			rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr amcl_change_state_client;
-			rclcpp::Client<nav2_msgs::srv::LoadMap>::SharedPtr load_map_client;
-			rclcpp::TimerBase::SharedPtr timer;
+		tf2_ros::TransformBroadcaster tf2_broadcaster;
+		tf2_ros::Buffer tf2_buffer;
+		tf2_ros::TransformListener tf2_listener;
 
-			R2Node (
-				Io *const io
-				, const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
-			)
-				: rclcpp::Node("r2", options)
-				, io{io}
-				, omni4{Omni4::make()}
-				, current_pose_sum{Mutexed<SumLastN<Xyth, XythLinear>>::make(SumLastN<Xyth, XythLinear>::make(10))}
-				, tf2_broadcaster{*this}
-				, tf2_buffer{this->get_clock()}
-				, tf2_listener{tf2_buffer}
-				// , can_tx{this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10)}
-				, robomas_target_frame_pubs {
-					[this]() -> std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> {
-						std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 8> pubs;
-						for(u32 i = 0; i < 4; ++i) {
-							pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target2_" + std::to_string(i), 10);
-						}
-						return pubs;
-					}()
-				}
-				, initial_pose_pub{this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 1)}
-				, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 1,
-					[this](const sensor_msgs::msg::Joy::SharedPtr joy) {
-						this->joy_callback(std::move(*joy));
-					}
-				))
-				, manual_recover_state_sub(this->create_subscription<std_msgs::msg::String>("r2/manual_recover_state", 1,
-					[this](const std_msgs::msg::String::SharedPtr msg) {
-						auto received = StateName::from_string(msg->data);
-						if(received.has_value()) {
-							this->io->manual_recover_state.set(std::move(received));
-						}
-						else {
-							printlns("invalid manual_recover_state: ", msg->data);
-						}
-					}
-				))
-				, balls_sub(this->create_subscription<nhk24_utils::msg::Balls>("balls", 1,
-					[this](const nhk24_utils::msg::Balls::SharedPtr balls) {
-						this->balls_callback(std::move(*balls));
-					}
-				))
-				, map_server_change_state_client(this->create_client<lifecycle_msgs::srv::ChangeState>("map_server/change_state"))
-				, amcl_change_state_client(this->create_client<lifecycle_msgs::srv::ChangeState>("amcl/change_state"))
-				, load_map_client(this->create_client<nav2_msgs::srv::LoadMap>("map_server/load_map"))
-				, timer(this->create_wall_timer(10ms, [this]() {
-					this->timer_callback();
-				}))
-			{
-				io->change_map = [this](const MapName::Enum map_name, const Xyth& initial_pose) -> std::future<void> {
-					return std::async(std::launch::async, [this, map_name, initial_pose]() {
-						this->change_map(map_name, initial_pose);
-					});
-				};
-			}
+		std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 4> robomas_target_frame_pubs;
+		rclcpp::Publisher<robomas_plugins::msg::Frame>::SharedPtr robomas_can_tx_pub;
+		
+		rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub;
+		// 本当はサービスにすべきだが、サービスを作るのめんどいので...
+		rclcpp::Subscription<std_msgs::msg::String>::SharedPtr manual_recover_mode_sub;
+		rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr target_silo_sub;
+		rclcpp::Subscription<nhk24_utils::msg::Balls>::SharedPtr balls_sub;
 
-			void joy_callback(sensor_msgs::msg::Joy&& joy) {
-				if(joy.buttons[Buttons::back]) {
-					this->io->change_manual_auto.set(ManualAuto::manual);
-				}
-				else if(joy.axes[Axes::cross_UD] < 0.5) {
-					if(joy.buttons[Buttons::a]) {
-						this->io->change_manual_auto.try_set(ManualAuto::auto_specified);
-					}
-					else if(joy.buttons[Buttons::b]) {
-						this->io->change_manual_auto.try_set(ManualAuto::auto_evacuated);
-					}
-				}
-				this->io->manual_speed.set(Xyth::make (
-					Xy::make (
-						-joy.axes[Axes::l_stick_LR] * robot_config::max_vxy / std::sqrt(2.0)
-						, joy.axes[Axes::l_stick_UD] * robot_config::max_vxy / std::sqrt(2.0)
-					)
-					, joy.axes[Axes::r_stick_LR] * robot_config::max_vth
-				));
-			}
+		rclcpp::TimerBase::SharedPtr timer;
 
-			void balls_callback(nhk24_utils::msg::Balls&& balls) {
-				if(balls.balls.empty()) {
-					this->io->ball_direction.set(std::nullopt);
-				}
-				else {
-					constexpr auto calc_direction = [](const nhk24_utils::msg::Ball& ball) -> double {
-						const auto v = Vec3d::from_msg<geometry_msgs::msg::Point>(ball.position);
-						return std::atan2(v.x, v.z);
-					};
-
-					const double last_direction = this->io->ball_direction.get().value_or(0.0);
-					double direction = calc_direction(balls.balls[0]);
-					for(const auto& ball : balls.balls) {
-						const double d = calc_direction(ball);
-						if(std::abs(d - last_direction) < std::abs(direction - last_direction)) {
-							direction = d;
-						}
-					}
-
-					this->io->ball_direction.set(direction);
-				}
-			}
-
-			void timer_callback() {
-				// input
-				const auto current_pose = get_pose(this->tf2_buffer, "map", "base_link");
-				if(current_pose.has_value()) {
-					auto current_pose_average = this->current_pose_sum.modify([current_pose](auto& sum) -> Xyth {
-						sum.push(*current_pose);
-						return sum.get_average();
-					});
-					this->io->current_pose.set(current_pose_average);
-				}
-				// printlns("current_pose: ", this->io->current_pose.get());
-
-				const auto true_odompose = get_pose(this->tf2_buffer, "odom", "true_base_link");
-				if(true_odompose.has_value()) {
-					const auto last_pose = this->last_true_odompose.modify(
-						[true_odompose](auto& last) {
-							const auto last_pose = last;
-							last = *true_odompose;
-							return last_pose;
-						}
-					);
-					io->current_speed.set((*true_odompose -XythOp{}- last_pose) /XythOp{}/ XythScalar::from(0.01));
-				}
-
-				// output
-				const auto body_speed = this->io->body_speed.get();
-				const auto motor_speeeds = this->omni4.update(body_speed);
-				this->send_motor_speeds(motor_speeeds);
-
-				// debug
-				// printlns("body_speed: ", body_speed);
-				// printlns("motor_speeeds: ", motor_speeeds);
-				// const auto manual_speed = this->io->manual_speed.get();
-				// printlns("manual_speed: ", manual_speed);
-			}
-
-			void send_motor_speeds(const std::array<double, 4>& speeds) {
-				this->robomas_target_frame_pubs[0]->publish(make_target_frame(-speeds[0]));
-				this->robomas_target_frame_pubs[3]->publish(make_target_frame(-speeds[1]));
-				this->robomas_target_frame_pubs[2]->publish(make_target_frame(-speeds[2]));
-				this->robomas_target_frame_pubs[1]->publish(make_target_frame(-speeds[3]));
-				
-				// for(u32 i = 0; i < 4; ++i) {
-				// 	if(const auto id = robot_config::ids[i]; id) {
-				// 		this->can_tx->publish(target_frame(*id, speeds[i]));
-				// 	}
-				// }
-			}
-
-			void change_map(const MapName::Enum filepath, const Xyth& initial_pose) {
-				{
-					this->current_pose_sum.modify([](auto& sum) {
-						sum.clear();
-					});
-				}
-				
-				{
-					io->busy_loop([this, filepath]() -> std::optional<Void> {
-						// map_serverに地図をロードさせる
-						auto req = std::make_shared<nav2_msgs::srv::LoadMap::Request>();
-						req->map_url = std::string{"map/"} + std::string(MapName::to_filepath(filepath)) + ".yaml";
-						if(this->load_map_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
-
-					printlns("map is loaded.");
-				}
-
-				{
-					// 初期位置を設定
-					auto initial_pose_msg = geometry_msgs::msg::PoseWithCovarianceStamped();
-					initial_pose_msg.header.frame_id = "map";
-					initial_pose_msg.pose.pose.position.x = initial_pose.xy.x;
-					initial_pose_msg.pose.pose.position.y = initial_pose.xy.y;
-					initial_pose_msg.pose.pose.orientation.z = std::sin(initial_pose.th / 2);  // ここら辺ほんとにあってるか不安(copilotくんはこう出してる)
-					initial_pose_msg.pose.pose.orientation.w = std::cos(initial_pose.th / 2);
-					this->initial_pose_pub->publish(initial_pose_msg);
-
-					// 最初のtransformを吐く
-					geometry_msgs::msg::TransformStamped transform{};
-					transform.header.frame_id = "map";
-					transform.header.stamp = this->now();
-					transform.child_frame_id = "odom";
-					transform.transform.rotation = initial_pose_msg.pose.pose.orientation;
-					transform.transform.translation.x = initial_pose.xy.x;
-					transform.transform.translation.y = initial_pose.xy.y;
-					this->tf2_broadcaster.sendTransform(transform);
-
-					rclcpp::sleep_for(500ms);
-
-					printlns("initial_pose is set.");
-				}
-			}
-
-			void kill() {
-				this->io->kill_interrupt.test_and_set();
-				rclcpp::sleep_for(100ms);
-				this->send_motor_speeds({0.0, 0.0, 0.0, 0.0});
-				rclcpp::sleep_for(100ms);
-			}
-		};
-
-		inline auto make_node (
+		R2Node (
 			const rclcpp::NodeOptions& options = rclcpp::NodeOptions()
-		) -> std::tuple<std::shared_ptr<R2Node>, std::future<std::optional<Io *>>, std::unique_ptr<Io>> {
-			auto io = Io::make_unique();
-			auto node = std::make_shared<R2Node>(io.get(), options);
-			auto fut = std::async(std::launch::async, [io = io.get(), node = node]() mutable -> std::optional<Io *> {
-				// ここ順番が大事。
-				// どいつがどのライフサイクルか、どのライフサイクルでどのクエリが投げられるかを考えること
-				{
-					io->busy_loop([node]() -> std::optional<Void> {
-						// map_server_change_state_clientを使えるようにする
-						if(node->map_server_change_state_client->wait_for_service(100ms)) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
-
-					io->busy_loop([node]() -> std::optional<Void> {
-						// map_serverをコンフィグレーション状態にする
-						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
-						if(node->map_server_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
-
-					io->busy_loop([node]() -> std::optional<Void> {
-						// map_serverをアクティブ状態にする
-						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
-						if(node->map_server_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
-
-					printlns("map_server is ready.");
+		)
+			: rclcpp::Node("r2", options)
+			, to_manual{Mutexed<bool>::make(false)}
+			, killed{Mutexed<bool>::make(false)}
+			, current_pose{Mutexed<Xyth>::make(Xyth::zero())}
+			, current_speed{Mutexed<Xyth>::make(Xyth::zero())}
+			, ball_direction{Mutexed<std::optional<double>>::make(std::nullopt)}
+			, forward_speed{Mutexed<double>::make(0.0)}
+			, collected_correctly{Mutexed<bool>::make(false)}
+			, target_silo{Mutexed<std::optional<SiloIndex::Enum>>::make(std::nullopt)}
+			, manual_speed{Mutexed<Xyth>::make(Xyth::zero())}
+			, change_to_auto{Mutexed<std::optional<std::variant<ModeContinue, ModeName::Enum>>>::make(std::nullopt)}
+			, target_speed{Mutexed<Xyth>::make(Xyth::zero())}
+			, servo_open{Mutexed<bool>::make(false)}
+			, dt_timer{LapTimer::make()}
+			, omni4{Omni4::make()}
+			, last_odompose{Mutexed<Xyth>::make(Xyth::zero())}
+			, recover_mode{Mutexed<std::optional<ModeName::Enum>>::make(std::nullopt)}
+			, tf2_broadcaster{*this}
+			, tf2_buffer{this->get_clock()}
+			, tf2_listener{tf2_buffer}
+			, robomas_target_frame_pubs {
+				[this]() -> std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 4> {
+					std::array<rclcpp::Publisher<robomas_plugins::msg::RobomasTarget>::SharedPtr, 4> pubs;
+					for(u32 i = 0; i < 4; ++i) {
+						pubs[i] = this->create_publisher<robomas_plugins::msg::RobomasTarget>("robomas_target2_" + std::to_string(i), 10);
+					}
+					return pubs;
+				}()
+			}
+			, robomas_can_tx_pub{this->create_publisher<robomas_plugins::msg::Frame>("robomas_can_tx", 10)}
+			, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 1,
+				[this](const sensor_msgs::msg::Joy::SharedPtr joy) {
+					this->joy_callback(std::move(*joy));
 				}
-				{
-					io->busy_loop([node]() -> std::optional<Void> {
-						// amcl_change_state_clientを使えるようにする
-						printlns("amcl_change_state_client wait_for_service.");
-						if(node->amcl_change_state_client->wait_for_service(100ms)) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
-
-					io->busy_loop([node]() -> std::optional<Void> {
-						// amclをコンフィグレーション状態にする
-						printlns("amcl_change_state_client to configure.");
-						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE;
-						if(node->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
-
-					io->busy_loop([node]() -> std::optional<Void> {
-						// amclをアクティブ状態にする
-						printlns("amcl_change_state_client to active.");
-						auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
-						req->transition.id = lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE;
-						if(node->amcl_change_state_client->async_send_request(std::move(req)).wait_for(100ms) == std::future_status::ready) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
-
-					printlns("amcl is ready.");
+			))
+			, manual_recover_mode_sub(this->create_subscription<std_msgs::msg::String>("r2/manual_recover_mode", 1,
+				[this](const std_msgs::msg::String::SharedPtr msg) {
+					auto received = ModeName::from_string(msg->data);
+					if(received.has_value()) {
+						this->recover_mode.set(std::move(received));
+					}
+					else {
+						printlns_to(std::osyncstream{std::cerr}, "invalid recover_mode: ", msg->data);
+					}
 				}
-				{
-					io->busy_loop([node]() -> std::optional<Void> {
-						// load_map_clientを使えるようにする
-						if(node->load_map_client->wait_for_service(100ms)) {
-							return Void{};
-						}
-						return std::nullopt;
-					});
-
-					printlns("load_map is ready.");
+			))
+			, target_silo_sub(this->create_subscription<std_msgs::msg::UInt8>("r2/target_silo", 1,
+				[this](const std_msgs::msg::UInt8::SharedPtr msg) {
+					const u8 data = msg->data - 1;
+					if(data < SiloIndex::N) this->target_silo.set(static_cast<SiloIndex::Enum>(data));
+					else printlns_to(std::osyncstream{std::cout}, "invalid target_silo: ", msg->data);
 				}
-				{
-					// 地図と初期位置を設定
-					node->change_map(MapName::area1, robot_config::area1_initialpose);
+			))
+			, balls_sub(this->create_subscription<nhk24_utils::msg::Balls>("balls", 1,
+				[this](const nhk24_utils::msg::Balls::SharedPtr balls) {
+					this->balls_callback(std::move(*balls));
 				}
+			))
+			, timer(this->create_wall_timer(10ms, [this]() {
+				this->timer_callback();
+			}))
+		{}
 
-				return io;
-			});
-			return {std::move(node), std::move(fut), std::move(io)};
+		void joy_callback(sensor_msgs::msg::Joy&& joy) {
+			if(joy.buttons[Buttons::back]) {
+				this->to_manual.set(true);
+			}
+			// else if(joy.axes[Axes::cross_UD] < 0.5) {
+			if(joy.buttons[Buttons::a]) {
+				if(const auto next_mode = this->recover_mode.get()) this->change_to_auto.set(*next_mode);
+				else printlns_to(std::osyncstream{std::cout}, "recover_mode is not set.");
+			}
+			else if(joy.buttons[Buttons::b]) {
+				this->change_to_auto.set(ModeContinue{});
+			}
+			// }
+			const auto manual_speed = Xyth::make (
+				Xy::make (
+					-joy.axes[Axes::l_stick_LR] * robot_config::max_vxy / std::sqrt(2.0)
+					, joy.axes[Axes::l_stick_UD] * robot_config::max_vxy / std::sqrt(2.0)
+				)
+				, joy.axes[Axes::r_stick_LR] * robot_config::max_vth
+			);
+			this->manual_speed.set(manual_speed);
+			this->forward_speed.set(manual_speed.xy.y);
+
+			if(joy.buttons[Buttons::l_push]) {
+				this->collected_correctly.set(true);
+			}
 		}
+
+		void balls_callback(nhk24_utils::msg::Balls&& balls) {
+			if(balls.balls.empty()) {
+				this->ball_direction.set(std::nullopt);
+			}
+			else {
+				constexpr auto calc_direction = [](const nhk24_utils::msg::Ball& ball) -> double {
+					const auto v = Vec3d::from_msg<geometry_msgs::msg::Point>(ball.position);
+					return std::atan2(v.x, v.z);
+				};
+
+				const double last_direction = this->ball_direction.get().value_or(0.0);
+				double direction = calc_direction(balls.balls[0]);
+				for(const auto& ball : balls.balls) {
+					const double d = calc_direction(ball);
+					if(std::abs(d - last_direction) < std::abs(direction - last_direction)) {
+						direction = d;
+					}
+				}
+
+				this->ball_direction.set(direction);
+			}
+		}
+
+		void timer_callback() {
+			const double dt = this->dt_timer.update().count();
+
+			const auto current_pose = get_pose(this->tf2_buffer, "map", "true_base_link");
+			if(current_pose.has_value()) {
+				this->current_pose.set(*current_pose);
+			}
+			// printlns_to(std::osyncstream{std::cout}, "current_pose: ", this->current_pose.get());
+
+			const auto odompose = get_pose(this->tf2_buffer, "odom", "true_base_link");
+			if(odompose.has_value()) {
+				const auto last_pose = this->last_odompose.modify(
+					[odompose](auto& last) {
+						const auto last_pose = last;
+						last = *odompose;
+						return last_pose;
+					}
+				);
+				this->current_speed.set((*odompose -XythOp{}- last_pose) /XythOp{}/ XythScalar::from(dt));
+			}
+
+			// output
+			const auto target_speed = this->target_speed.get();
+			const auto motor_speeeds = this->omni4.update(target_speed);
+			this->send_motor_speeds(motor_speeeds);
+
+			const auto servo_open = this->servo_open.get();
+			(void)servo_open;  // do nothing for now
+		}
+
+		void send_motor_speeds(const std::array<double, 4>& speeds) {
+			this->robomas_target_frame_pubs[0]->publish(make_target_frame(-speeds[0]));
+			this->robomas_target_frame_pubs[3]->publish(make_target_frame(-speeds[1]));
+			this->robomas_target_frame_pubs[2]->publish(make_target_frame(-speeds[2]));
+			this->robomas_target_frame_pubs[1]->publish(make_target_frame(-speeds[3]));
+		}
+
+		void kill() {
+			this->killed.set(true);
+			rclcpp::sleep_for(100ms);
+			this->send_motor_speeds({0.0, 0.0, 0.0, 0.0});
+			rclcpp::sleep_for(100ms);
+		}
+	};
+
+	struct CommonIo final {
+		std::shared_ptr<R2Node> node;
+		Mutexed<bool> * accept_killed;
+
+		auto killed() const -> bool {
+			return this->node->killed.get();
+		}
+
+		auto to_manual() const -> bool {
+			return this->node->to_manual.get();
+		}
+
+		void notify_killed() {
+			this->accept_killed->set(true);
+		}
+	};
+
+	template<class Inputor_, class Outputor_>
+	struct Executor {
+		Inputor_ input;
+		Outputor_ output;
+	};
+
+	inline auto make_executor (
+		auto&& inputor
+		, auto&& outputor
+	) {
+		return [inputor = std::forward<decltype(inputor)>(inputor), outputor = std::forward<decltype(outputor)>(outputor)] {
+				return Executor<std::remove_cvref_t<decltype(inputor)>, std::remove_cvref_t<decltype(outputor)>> {
+				std::forward<decltype(inputor)>(inputor)
+				, std::forward<decltype(outputor)>(outputor)
+			};
+		};
+	}
+
+	inline auto make_r2_controller_unique(const std::shared_ptr<R2Node>& node, Mutexed<bool>& killed) {
+		return r2_controller::make_r2_controller_unique (
+			make_executor (
+				[node]() -> PursuitIn {
+					return PursuitIn {
+						node->current_pose.get()
+						, node->current_speed.get()
+					};
+				}
+				, [node](PursuitOut&& out) {
+					node->target_speed.set(out.target_speed);
+				}
+			)
+			, make_executor (
+				[node]() -> CollectBall::In {
+					return CollectBall::In {
+						node->current_pose.get()
+						, node->ball_direction.get()
+						, node->forward_speed.get()
+						, node->collected_correctly.get()
+					};
+				}
+				, [node](CollectBall::Out&& out) {
+					node->target_speed.set(out.target_speed);
+				}
+			)
+			, make_executor (
+				[node]() -> WatchSilo::In {
+					return WatchSilo::In {
+						node->target_silo.get()
+						, node->current_pose.get()
+						, node->current_speed.get()
+					};
+				}
+				, [node](WatchSilo::Out&& out) {
+					node->target_speed.set(out.target_speed);
+				}
+			)
+			, make_executor (
+				[node]() -> Harvest::In {
+					return Harvest::In{};
+				}
+				, [node](Harvest::Out&& out) {
+					node->target_speed.set(out.target_speed);
+					node->servo_open.set(out.servo_open);
+				}
+			)
+			, make_executor (
+				[node]() -> Manual::In {
+					return Manual::In {
+						node->manual_speed.get()
+						, node->change_to_auto.get()
+					};
+				}
+				, [node](Manual::Out&& out) {
+					node->target_speed.set(out.target_speed);
+				}
+			)
+			, CommonIo {
+				node
+				, &killed
+			}
+			, ModeArg::template make<ModeName::area1_start>(Void{})
+		);
 	}
 }
 
 namespace nhk24_2nd_ws::r2::r2_node {
 	using impl::R2Node;
-	using impl::make_node;
+	using impl::make_r2_controller_unique;
 }

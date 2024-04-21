@@ -12,9 +12,9 @@
 
 #include <my_include/std_types.hpp>
 #include <my_include/xyth.hpp>
+#include <my_include/lap_timer.hpp>
 
 #include "robot_config.hpp"
-#include "lap_timer.hpp"
 
 namespace nhk24_2nd_ws::r2::omni4::impl {
 	using xyth::Xy;

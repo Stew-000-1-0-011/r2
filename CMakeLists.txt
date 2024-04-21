@@ -4,7 +4,7 @@ project(r2)
 set(CMAKE_CXX_COMPILER "/usr/bin/g++-13")  #
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic -std=c++23 -fconcepts-diagnostics-depth=3 -Wno-subobject-linkage)  #
+  add_compile_options(-Wall -Wextra -Wpedantic -std=c++23 -fconcepts-diagnostics-depth=3 -Wno-subobject-linkage -O2 -fmax-errors=1)  #
 endif()
 
 # find dependencies
@@ -91,33 +91,33 @@ ament_target_dependencies(collect_debug_node
   nav2_amcl
 )
 
-#
-add_executable(silo_position_publish_node
-  src/silo_position_publish_node.cpp
-)
-ament_target_dependencies(silo_position_publish_node
-  rclcpp
-  tf2
-  tf2_ros
-  tf2_geometry_msgs
-)
+# #
+# add_executable(silo_position_publish_node
+#   src/silo_position_publish_node.cpp
+# )
+# ament_target_dependencies(silo_position_publish_node
+#   rclcpp
+#   tf2
+#   tf2_ros
+#   tf2_geometry_msgs
+# )
 
-# 
-add_executable(hoge_node
-  src/hoge.cpp
-)
-ament_target_dependencies(hoge_node
-  rclcpp
-  std_msgs
-  std_srvs
-  nav2_msgs
-  lifecycle_msgs
-  tf2
-  tf2_ros
-  tf2_geometry_msgs
-  can_plugins2
-  sensor_msgs
-)
+# # 
+# add_executable(hoge_node
+#   src/hoge.cpp
+# )
+# ament_target_dependencies(hoge_node
+#   rclcpp
+#   std_msgs
+#   std_srvs
+#   nav2_msgs
+#   lifecycle_msgs
+#   tf2
+#   tf2_ros
+#   tf2_geometry_msgs
+#   can_plugins2
+#   sensor_msgs
+# )
 
 # 
 install(
@@ -125,8 +125,8 @@ install(
     r2_node  #
     filter_node  #
     collect_debug_node  #
-    silo_position_publish_node  #
-    hoge_node  #
+    # silo_position_publish_node  #
+    # hoge_node  #
   DESTINATION lib/${PROJECT_NAME}
 )
 

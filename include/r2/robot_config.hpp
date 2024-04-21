@@ -17,20 +17,6 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 	using nhk24_2nd_ws::xyth::Xy;
 	using nhk24_2nd_ws::xyth::Xyth;
 
-	inline constexpr auto test_ids = std::array<std::optional<u32>, 4> {
-		std::make_optional(0x160)
-		, std::make_optional(0x164)
-		, std::make_optional(0x110)
-		, std::make_optional(0x154)
-	};
-	
-	inline constexpr auto ids = std::array<std::optional<u32>, 4> {
-		std::make_optional(0x110)
-		, std::make_optional(0x200)
-		, std::make_optional(0x16c)
-		, std::make_optional(0x210)
-	};
-
 	inline constexpr Xy footprint_half_diagonal = Xy::make(0.275, 0.275);  // フットプリントの半対角線長[m]
 
 	inline constexpr double max_v = 500.0 * 0.5;  // モーターの最大速度[rad/s]
@@ -47,26 +33,9 @@ namespace nhk24_2nd_ws::r2::robot_config::impl {
 
 	inline constexpr double shadow_filter_threshold_angle = std::numbers::pi / 15.0;  // シャドウフィルタの閾値[rad]
 	inline constexpr u16 shadow_window = 10;  // シャドウフィルタの窓幅
-
-	inline constexpr Xyth slope_speed = Xyth::make(Xy::make(0.0, 1.0), 0.0);  // 坂道を登るときの速度
-	inline constexpr std::chrono::duration<double> go_up_slope_duration = 2.5s;  // 坂道を登るときの時間
-	inline constexpr Xyth area1_initialpose = Xyth::make(Xy::make(5.375, 0.400), 0.0);  // エリア1の初期位置
-	inline constexpr Xyth area2_initialpose = Xyth::make(Xy::make(5.375, 0.400), 0.0);  // エリア2の坂越え後の初期位置
-	inline constexpr Xyth yellow_initialpose = Xyth::make(Xy::make(1.525, 0.400), 0.0);  // エリア3の坂越え後の初期位置
-	inline constexpr Xyth storage_entry_point = Xyth::make(Xy::make(3.625, 2.0), -std::numbers::pi / 2.0);  // エリア3のストレージゾーンの出入り位置
-
-	inline constexpr std::array<Xyth, 5> silo_positions = {
-		Xyth::make(Xy::make(-0.125, 0.5), 0.0)
-		, Xyth::make(Xy::make(-0.125, 1.25), 0.0)
-		, Xyth::make(Xy::make(-0.125, 2.5), 0.0)
-		, Xyth::make(Xy::make(-0.125, 3.25), 0.0)
-		, Xyth::make(Xy::make(-0.125, 4.5), 0.0)
-	};
 }
 
 namespace nhk24_2nd_ws::r2::robot_config {
-	using impl::test_ids;
-	using impl::ids;
 	using impl::footprint_half_diagonal;
 	using impl::max_v;
 	using impl::max_a;
@@ -80,12 +49,5 @@ namespace nhk24_2nd_ws::r2::robot_config {
 	using impl::area_half_diagonal;
 	using impl::shadow_filter_threshold_angle;
 	using impl::shadow_window;
-	using impl::slope_speed;
-	using impl::go_up_slope_duration;
-	using impl::area1_initialpose;
-	using impl::area2_initialpose;
-	using impl::yellow_initialpose;
-	using impl::storage_entry_point;
-	using impl::silo_positions;
 }
 

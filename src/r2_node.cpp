@@ -1,55 +1,55 @@
+#include <chrono>
 #include <memory>
-#include <thread>
-#include <utility>
-#include <syncstream>
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <my_include/mutexed.hpp>
 #include <my_include/debug_print.hpp>
-#include <my_include/state_machine.hpp>
 
-#include <r2/robot_io.hpp>
 #include <r2/r2_node.hpp>
-#include <r2/states/states.hpp>
-#include <r2/manual_stop_node.hpp>
+#include <r2/map_amcl_manager_node.hpp>
 
-using nhk24_2nd_ws::debug_print::printlns;
-using nhk24_2nd_ws::debug_print::PinCOut;
-using nhk24_2nd_ws::state_machine::StateMachine;
-using nhk24_2nd_ws::r2::robot_io::Io;
+using namespace std::chrono_literals;
+
+using nhk24_2nd_ws::mutexed::Mutexed;
+using nhk24_2nd_ws::debug_print::printlns_to;
 using nhk24_2nd_ws::r2::r2_node::R2Node;
-using nhk24_2nd_ws::r2::r2_node::make_node;
-using nhk24_2nd_ws::r2::r2_node::make_node;
-namespace transit_state = nhk24_2nd_ws::r2::transit_state;
-using nhk24_2nd_ws::r2::manual_stop_node::ManualStopNode;
+using nhk24_2nd_ws::r2::r2_node::make_r2_controller_unique;
+using nhk24_2nd_ws::r2::map_amcl_manager_node::MapAmclManagerNode;
 
 int main(int argc, char *argv[]) {
 	rclcpp::init(argc, argv);
 
-	auto manual_stop_node = std::make_shared<ManualStopNode>();
-	auto [node, io_fut, io_uptr] = make_node();
+	std::shared_ptr<Mutexed<bool>> r2_controller_killed = std::shared_ptr<Mutexed<bool>>(new Mutexed<bool>(Mutexed<bool>::make(false)));
 
-	rclcpp::on_shutdown([node] {
-		node->kill();
+	auto r2_node = std::make_shared<R2Node>();
+	auto map_amcl_manager_node = std::make_shared<MapAmclManagerNode>();
+	auto r2_controller = make_r2_controller_unique (
+		r2_node,
+		*r2_controller_killed
+	);
+
+	rclcpp::on_shutdown([r2_node, map_amcl_manager_node, r2_controller_killed] {
+		r2_node->kill();
+		map_amcl_manager_node->kill();
+
+		while(!r2_controller_killed->get() || !map_amcl_manager_node->done.get()) {
+			std::this_thread::sleep_for(500ms);
+			printlns_to(std::osyncstream{std::cout}, "waiting for r2_controller and map_amcl_manager are killed.", r2_controller_killed->get(), map_amcl_manager_node->done.get());
+		}
 	});
 
 	rclcpp::executors::MultiThreadedExecutor executor{};
-	executor.add_node(manual_stop_node);
-	executor.add_node(node);
+	executor.add_node(r2_node);
+	executor.add_node(map_amcl_manager_node);
 
-	std::jthread state_machine_thread([io_fut = std::move(io_fut)] mutable {
-		printlns("state_machine_thread start.");
-		auto machine = StateMachine<Io>::make (
-			transit_state::to_manual(transit_state::to_pass_area1())
-		);
-		auto io = io_fut.get();
-		if(io) machine.run(**io);
-		printlns("state_machine_thread end.");
+	std::jthread r2_controller_thread([r2_controller = std::move(r2_controller)] mutable {
+		printlns_to(std::osyncstream{std::cout}, "r2_controller_thread start.");
+		r2_controller->run();
+		printlns_to(std::osyncstream{std::cout}, "r2_controller_thread end.");
 	});
 
-	printlns("r2_node start.");
+	printlns_to(std::osyncstream{std::cout}, "r2_node spin start.");
 	executor.spin();
-
-	printlns("r2_node end.");
-	printlns("kill_interrupted: ", node->io->kill_interrupted());
+	printlns_to(std::osyncstream{std::cout}, "r2_node spin end.");
 }
