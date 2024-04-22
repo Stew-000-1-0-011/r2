@@ -11,6 +11,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <tf2/LinearMath/Quaternion.h>
+
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
@@ -23,6 +25,7 @@
 #include <my_include/void.hpp>
 #include <my_include/mutexed.hpp>
 #include <my_include/debug_print.hpp>
+#include <my_include/lap_timer.hpp>
 
 #include "position_based_behaviour.hpp"
 #include "field_constant.hpp"
@@ -33,6 +36,7 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 	using void_::Void;
 	using mutexed::Mutexed;
 	using debug_print::printlns_to;
+	using lap_timer::LapTimer;
 	using position_based_bahaviour::PositionBasedBehaviour;
 	using field_constant::Section;
 	using ros2_utils::get_pose;
@@ -79,14 +83,18 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 		, killed{Mutexed<bool>::make(false)}
 		, done{Mutexed<bool>::make(false)}
 		, initpose_sub{this->create_subscription<nhk24_utils::msg::Twist2d>("r2/initialpose", 1, [this](const nhk24_utils::msg::Twist2d::SharedPtr msg) {
-			geometry_msgs::msg::PoseWithCovarianceStamped send_msg{};
-			send_msg.header.frame_id = "map";
-			send_msg.header.stamp = this->now();
-			send_msg.pose.pose.position.x = msg->linear.x;
-			send_msg.pose.pose.position.y = msg->linear.y;
-			send_msg.pose.pose.orientation.z = std::sin(msg->angular / 2);
-			send_msg.pose.pose.orientation.w = std::cos(msg->angular / 2);
-			this->initial_pose_pub->publish(send_msg);
+			
+			const auto pose_in_map = Xyth::make(Xy::make(msg->linear.x, msg->linear.y), msg->angular);
+			auto wait_timer = LapTimer::make();
+			while(wait_timer.watch().count() < 0.5) {
+				if(auto pose_in_odom = get_pose(this->tf2_buffer, "odom", "true_base_link")) {
+					auto t = make_transform("map", "odom", this->now(), calc_transform(pose_in_map, *pose_in_odom));
+					tf2_broadcaster.sendTransform(t);
+					auto p = make_pose_stamped("map", this->now(), pose_in_map);
+					initial_pose_pub->publish(p);
+				}
+			}
+			printlns_to(std::osyncstream{std::cout}, __FILE__, __LINE__, "fail to get pose in odom.");
 		})}
 		, timer{this->create_wall_timer(10ms, [this]() {
 			if(const auto current_pose = get_pose(this->tf2_buffer, "map", "true_base_link")) {
