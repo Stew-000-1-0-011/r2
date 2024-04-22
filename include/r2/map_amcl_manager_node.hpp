@@ -88,7 +88,7 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 			auto wait_timer = LapTimer::make();
 			while(wait_timer.watch().count() < 0.5) {
 				if(auto pose_in_odom = get_pose(this->tf2_buffer, "odom", "true_base_link")) {
-					auto t = make_transform("map", "odom", this->now(), calc_transform(pose_in_map, *pose_in_odom));
+					auto t = make_transform_stamped("map", "odom", this->now(), calc_transform(pose_in_map, *pose_in_odom));
 					tf2_broadcaster.sendTransform(t);
 					auto p = make_pose_stamped("map", this->now(), pose_in_map);
 					initial_pose_pub->publish(p);
@@ -263,6 +263,35 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 
 				this->done.set(true);
 			});
+		}
+
+		static auto make_pose_stamped(const std::string_view frame_id, const rclcpp::Time& time, const Xyth& xyth) -> geometry_msgs::msg::PoseWithCovarianceStamped {
+			geometry_msgs::msg::PoseWithCovarianceStamped p{};
+			p.header.frame_id = frame_id;
+			p.header.stamp = time;
+			p.pose.pose.position.x = xyth.xy.x;
+			p.pose.pose.position.y = xyth.xy.y;
+			p.pose.pose.position.z = 0.0;
+			p.pose.pose.orientation.x = 0.0;
+			p.pose.pose.orientation.y = 0.0;
+			p.pose.pose.orientation.z = std::sin(xyth.th / 2);
+			p.pose.pose.orientation.w = std::cos(xyth.th / 2);
+			return p;
+		}
+
+		static auto make_transform_stamped(const std::string_view frame_id, const std::string_view child_frame_id, const rclcpp::Time& time, const Xyth& xyth) -> geometry_msgs::msg::TransformStamped {
+			geometry_msgs::msg::TransformStamped t{};
+			t.header.frame_id = frame_id;
+			t.header.stamp = time;
+			t.child_frame_id = child_frame_id;
+			t.transform.translation.x = xyth.xy.x;
+			t.transform.translation.y = xyth.xy.y;
+			t.transform.translation.z = 0.0;
+			t.transform.rotation.x = 0.0;
+			t.transform.rotation.y = 0.0;
+			t.transform.rotation.z = std::sin(xyth.th / 2);
+			t.transform.rotation.w = std::cos(xyth.th / 2);
+			return t;
 		}
 	};
 }
