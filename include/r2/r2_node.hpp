@@ -285,6 +285,8 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 			const auto servo_open = this->servo_open.get();
 			(void)servo_open;  // do nothing for now
+
+			printlns_to(std::osyncstream{std::cout}, "manual_speed: ", this->manual_speed.get());
 		}
 
 		void send_motor_speeds(const std::array<double, 4>& speeds) {
@@ -392,6 +394,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					};
 				}
 				, [node](Manual::Out&& out) {
+					printlns_to(std::osyncstream{std::cout}, "in manual executor: target_speed is ", out.target_speed);
 					node->target_speed.set(out.target_speed);
 				}
 			)
@@ -399,7 +402,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 				node
 				, &killed
 			}
-			, ModeArg::template make<ModeName::area1_start>(Void{})
+			, ModeArg::template make<ModeName::manual>(ModeName::area1_start)
 		);
 	}
 }

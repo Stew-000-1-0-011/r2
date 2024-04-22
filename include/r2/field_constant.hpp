@@ -93,7 +93,7 @@ namespace nhk24_2nd_ws::r2::field_constant::impl {
 	#if 1
 	namespace points {
 		// start point of robot
-		inline constexpr Xy area1_start = Xy::make(5.475, 0.350);
+		inline constexpr Xy area1_start = Xy::make(5.375, 0.350);
 		inline constexpr Xy area2_start = Xy::make(5.525, 5.500);
 
 

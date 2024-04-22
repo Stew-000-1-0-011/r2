@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <concepts>
+#include <chrono>
 
 #include <my_include/debug_print.hpp>
 
@@ -17,6 +18,7 @@
 
 namespace nhk24_2nd_ws::r2::r2_controller::impl {
 	using namespace std::string_literals;
+	using namespace std::chrono_literals;
 	using debug_print::printlns_to;
 	using mode::is_mode;
 	using mode::ModeOutput;
@@ -134,7 +136,7 @@ namespace nhk24_2nd_ws::r2::r2_controller::impl {
 
 		void run() {
 			while(this->mode.index() != 0) {
-				// printlns_to(std::osyncstream{std::cout},"in r2_controller::run2.");
+				printlns_to(std::osyncstream{std::cout},"in r2_controller::run2.");
 				std::visit([this](auto& m) {
 					using Mode = std::remove_cvref_t<decltype(m)>;
 					if constexpr(not std::same_as<Mode, std::monostate>) {
@@ -158,7 +160,7 @@ namespace nhk24_2nd_ws::r2::r2_controller::impl {
 							auto out = m.update(in);
 							// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 							if(out.is_output()) {
-								// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
+								printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 								executor.output(std::move(out).get_output());
 								// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 							}
@@ -170,6 +172,8 @@ namespace nhk24_2nd_ws::r2::r2_controller::impl {
 								printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 								break;
 							}
+
+							std::this_thread::sleep_for(10ms);
 						}
 
 						this->common_io.notify_killed();

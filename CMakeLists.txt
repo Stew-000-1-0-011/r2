@@ -55,6 +55,26 @@ ament_target_dependencies(r2_node
 )
 
 # 
+add_executable(map_amcl_manager_node
+  src/map_amcl_manager_node.cpp
+)
+ament_target_dependencies(map_amcl_manager_node
+  rclcpp
+  std_msgs
+  std_srvs
+  lifecycle_msgs
+  geometry_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  nav2_msgs
+  sensor_msgs
+  can_plugins2
+  robomas_plugins
+  nhk24_utils
+)
+
+# 
 add_executable(filter_node
   src/filter_node.cpp
 )
@@ -123,6 +143,7 @@ ament_target_dependencies(collect_debug_node
 install(
   TARGETS
     r2_node  #
+    map_amcl_manager_node #
     filter_node  #
     collect_debug_node  #
     # silo_position_publish_node  #
