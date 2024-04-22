@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <memory>
 #include <tuple>
 #include <stop_token>
@@ -17,6 +18,7 @@
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <lifecycle_msgs/srv/change_state.hpp>
 #include <nav2_msgs/srv/load_map.hpp>
+#include <nhk24_utils/msg/twist2d.hpp>
 
 #include <my_include/void.hpp>
 #include <my_include/mutexed.hpp>
@@ -50,6 +52,7 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 		Mutexed<bool> killed;
 		Mutexed<bool> done;
 
+		rclcpp::Subscription<nhk24_utils::msg::Twist2d>::SharedPtr initpose_sub;
 		rclcpp::TimerBase::SharedPtr timer;
 
 		MapAmclManagerNode()
@@ -75,6 +78,16 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 		, setup_fut{}
 		, killed{Mutexed<bool>::make(false)}
 		, done{Mutexed<bool>::make(false)}
+		, initpose_sub{this->create_subscription<nhk24_utils::msg::Twist2d>("r2/initialpose", 1, [this](const nhk24_utils::msg::Twist2d::SharedPtr msg) {
+			geometry_msgs::msg::PoseWithCovarianceStamped send_msg{};
+			send_msg.header.frame_id = "map";
+			send_msg.header.stamp = this->now();
+			send_msg.pose.pose.position.x = msg->linear.x;
+			send_msg.pose.pose.position.y = msg->linear.y;
+			send_msg.pose.pose.orientation.z = std::sin(msg->angular / 2);
+			send_msg.pose.pose.orientation.w = std::cos(msg->angular / 2);
+			this->initial_pose_pub->publish(send_msg);
+		})}
 		, timer{this->create_wall_timer(10ms, [this]() {
 			if(const auto current_pose = get_pose(this->tf2_buffer, "map", "true_base_link")) {
 				this->behaviour.update(current_pose.value().xy);
@@ -118,6 +131,8 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 				}
 			});
 		}
+
+		
 
 		auto busy_loop(auto&& f) -> std::optional<std::remove_cvref_t<decltype(*f())>> {
 			while(!this->killed.get()) {

@@ -6,6 +6,8 @@
 #include <type_traits>
 #include <concepts>
 
+#include <my_include/debug_print.hpp>
+
 #include "mode.hpp"
 #include "modes/pursuit.hpp"
 #include "modes/collect_ball.hpp"
@@ -15,6 +17,7 @@
 
 namespace nhk24_2nd_ws::r2::r2_controller::impl {
 	using namespace std::string_literals;
+	using debug_print::printlns_to;
 	using mode::is_mode;
 	using mode::ModeOutput;
 	using mode::ModeName;
@@ -63,17 +66,22 @@ namespace nhk24_2nd_ws::r2::r2_controller::impl {
 		using Mode = std::remove_cvref_t<decltype(std::get<mname_>(mode))>;
 
 		static auto generate_mode(ModeArg&& marg) -> MVariant {
-			return [idx = marg.arg.index(), marg = std::move(marg)]<u8 ... u8mnames_>(std::integer_sequence<u8, u8mnames_ ...>)
+			auto ret = [idx = marg.arg.index(), marg = std::move(marg)]<u8 ... u8mnames_>(std::integer_sequence<u8, u8mnames_ ...>)
 			{
-				std::unique_ptr<MVariant> ret{};
-				([idx, marg]<ModeName::Enum mname_>(std::unique_ptr<MVariant>& ret) {
+				// printlns_to(std::osyncstream{std::cout},"in generate_mode: ", __LINE__);
+				MVariant ret{};
+				// printlns_to(std::osyncstream{std::cout},"in generate_mode: ", __LINE__);
+				([idx, marg]<ModeName::Enum mname_>(MVariant& ret) {
+					// printlns_to(std::osyncstream{std::cout},"in generate_mode: ", __LINE__);
 					if(idx == mname_) {
-						ret = std::make_unique<MVariant>(std::in_place_index<mname_>, Mode<mname_>::make(std::get<mname_>(marg.arg)));
+						ret = MVariant{std::in_place_index<mname_>, Mode<mname_>::make(std::get<mname_>(marg.arg))};
 					}
 				}.template operator()<static_cast<ModeName::Enum>(u8mnames_ + 1)>(ret), ...);
-
-				return std::move(*ret);
+				// printlns_to(std::osyncstream{std::cout},"in generate_mode: ", __LINE__);
+				return ret;
 			}(std::make_integer_sequence<u8, ModeName::N - 1>{});
+			// printlns_to(std::osyncstream{std::cout},"in generate_mode: ", __LINE__);
+			return ret;
 		}
 
 		static auto make_unique (
@@ -126,15 +134,16 @@ namespace nhk24_2nd_ws::r2::r2_controller::impl {
 
 		void run() {
 			while(this->mode.index() != 0) {
+				// printlns_to(std::osyncstream{std::cout},"in r2_controller::run2.");
 				std::visit([this](auto& m) {
 					using Mode = std::remove_cvref_t<decltype(m)>;
 					if constexpr(not std::same_as<Mode, std::monostate>) {
 						auto executor = this->get_executor<Mode::name>();
 
 						while(true) {
+							// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 							if(this->common_io.killed()) {
-								this->common_io.notify_killed();
-								return;
+								break;
 							}
 
 							if(this->common_io.to_manual()) {
@@ -142,22 +151,32 @@ namespace nhk24_2nd_ws::r2::r2_controller::impl {
 								break;
 							}
 
+							// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
+
 							auto in = executor.input();
+							// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 							auto out = m.update(in);
+							// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 							if(out.is_output()) {
+								// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 								executor.output(std::move(out).get_output());
+								// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 							}
 							else {
-								this->mode = generate_mode(std::move(out).get_arg());
+								printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
+								auto arg = std::move(out).get_arg();
+								printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
+								this->mode = generate_mode(std::move(arg));
+								printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 								break;
 							}
 						}
+
+						this->common_io.notify_killed();
 					}
 				}, this->mode);
 			}
 		}
-
-
 	};
 
 	inline auto make_r2_controller_unique (

@@ -29,11 +29,18 @@ int main(int argc, char *argv[]) {
 		*r2_controller_killed
 	);
 
-	rclcpp::on_shutdown([r2_node, map_amcl_manager_node, r2_controller_killed] {
+	rclcpp::on_shutdown( [
+		r2_node
+		, r2_controller_killed
+		, map_amcl_manager_node
+	] {
 		r2_node->kill();
 		map_amcl_manager_node->kill();
 
-		while(!r2_controller_killed->get() || !map_amcl_manager_node->done.get()) {
+		while (
+			!r2_controller_killed->get()
+			|| !map_amcl_manager_node->done.get()
+		) {
 			std::this_thread::sleep_for(500ms);
 			printlns_to(std::osyncstream{std::cout}, "waiting for r2_controller and map_amcl_manager are killed.", r2_controller_killed->get(), map_amcl_manager_node->done.get());
 		}
@@ -43,7 +50,7 @@ int main(int argc, char *argv[]) {
 	executor.add_node(r2_node);
 	executor.add_node(map_amcl_manager_node);
 
-	std::jthread r2_controller_thread([r2_controller = std::move(r2_controller)] mutable {
+	std::jthread r2_controller_thread([r2_controller = std::move(r2_controller), r2_node] mutable {
 		printlns_to(std::osyncstream{std::cout}, "r2_controller_thread start.");
 		r2_controller->run();
 		printlns_to(std::osyncstream{std::cout}, "r2_controller_thread end.");

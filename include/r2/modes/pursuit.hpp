@@ -71,9 +71,9 @@ namespace nhk24_2nd_ws::r2::modes::pursuit::impl {
 				else {
 					switch(now_) {
 						case ModeName::area1_start:
-							return path_load("map/"s + std::string{ModeName::to_string(now_)} + ".txt");
+							return path_load("path/"s + std::string{ModeName::to_string(now_)} + ".txt");
 						case ModeName::area2_start:
-							return path_load("map/"s + std::string{ModeName::to_string(now_)} + ".txt");
+							return path_load("path/"s + std::string{ModeName::to_string(now_)} + ".txt");
 						case ModeName::goto_center_storage:
 							return make_path_to_pose(poses::look_around_storage, XythScalar::make(0.03, 0.05));
 						case ModeName::goto_silo_watch_point:
