@@ -143,12 +143,15 @@ namespace nhk24_2nd_ws::r2::r2_controller::impl {
 						auto executor = this->get_executor<Mode::name>();
 
 						while(true) {
+							printlns_to(std::osyncstream{std::cout}, "Mode name: ", ModeName::to_string(Mode::name));
+							
 							// printlns_to(std::osyncstream{std::cout},"in r2_controller::run: ", __LINE__);
 							if(this->common_io.killed()) {
+								this->mode = std::monostate{};
 								break;
 							}
 
-							if(this->common_io.to_manual()) {
+							if(this->common_io.to_manual() && Mode::name != ModeName::manual) {
 								this->mode = generate_mode(ModeArg{ModeArg::ArgVs{std::in_place_index<ModeName::manual>, Mode::name}});
 								break;
 							}
@@ -176,10 +179,11 @@ namespace nhk24_2nd_ws::r2::r2_controller::impl {
 							std::this_thread::sleep_for(10ms);
 						}
 
-						this->common_io.notify_killed();
 					}
 				}, this->mode);
 			}
+
+			this->common_io.notify_killed();
 		}
 	};
 

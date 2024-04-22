@@ -4,6 +4,7 @@
 
 #include <my_include/std_types.hpp>
 #include <my_include/xyth.hpp>
+#include <my_include/debug_print.hpp>
 
 namespace nhk24_2nd_ws::r2::field_constant::impl {
 	using xyth::Xy;
@@ -131,7 +132,7 @@ namespace nhk24_2nd_ws::r2::field_constant::impl {
 
 	inline constexpr auto get_zone(const Xy& p) noexcept -> std::variant<Section::Enum, BetweenSections> {
 		if(p.y <= 4.000) {
-			if(p.x <= 4.875 || p.y <= 3.000 - xy_error_max) {
+			if(p.x <= 4.775 || p.y <= 3.000 - xy_error_max) {
 				return Section::area1;
 			} else if(p.y <= 3.000 + xy_error_max) {
 				return BetweenSections{Section::area1, Section::slope12};
@@ -142,10 +143,10 @@ namespace nhk24_2nd_ws::r2::field_constant::impl {
 			}
 		}
 		else if(p.y <= 8.000) {
-			if(4.875 <= p.x && p.y <= 4.000 + xy_error_max) {
+			if(4.775 <= p.x && p.y <= 4.000 + xy_error_max) {
 				return BetweenSections{Section::slope12, Section::area2};
 			}
-			else if(p.x <= 1.075 || 2.075 <= p.x || p.y <= 7.000 - xy_error_max) {
+			else if(p.x <= 1.025 || 2.125 <= p.x || p.y <= 7.000 - xy_error_max) {
 				return Section::area2;
 			}
 			else if(p.y <= 7.000 + xy_error_max) {
@@ -159,7 +160,7 @@ namespace nhk24_2nd_ws::r2::field_constant::impl {
 			}
 		}
 		else {
-			if(1.075 <= p.x && p.x <= 2.075 && p.y <= 8.000 + xy_error_max) {
+			if(1.025 <= p.x && p.x <= 2.125 && p.y <= 8.000 + xy_error_max) {
 				return BetweenSections{Section::slope2Y, Section::yellow};
 			}
 			else if(p.x <= 2.625 - xy_error_max) {
@@ -185,6 +186,13 @@ namespace nhk24_2nd_ws::r2::field_constant::impl {
 
 	inline constexpr auto where_am_i(const Xy& p, const Section::Enum last_i_am) noexcept -> Section::Enum {
 		const auto zone = get_zone(p);
+		// if(zone.index() == 0) {
+		// 	debug_print::printlns_to(std::osyncstream{std::cout}, "zone: Section: ", int(std::get<0>(zone)));
+		// }
+		// else {
+		// 	const auto [a, b] = std::get<1>(zone);
+		// 	debug_print::printlns_to(std::osyncstream{std::cout}, "zone: betweenSection: ", int(a), int(b));
+		// }
 		if(is_in(last_i_am, zone)) {
 			return last_i_am;
 		}

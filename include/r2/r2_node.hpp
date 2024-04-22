@@ -207,9 +207,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 		{}
 
 		void joy_callback(sensor_msgs::msg::Joy&& joy) {
-			if(joy.buttons[Buttons::back]) {
-				this->to_manual.set(true);
-			}
+			this->to_manual.set(joy.buttons[Buttons::back]);
 			// else if(joy.axes[Axes::cross_UD] < 0.5) {
 			if(joy.buttons[Buttons::a]) {
 				if(const auto next_mode = this->recover_mode.get()) this->change_to_auto.set(*next_mode);
@@ -217,6 +215,9 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			}
 			else if(joy.buttons[Buttons::b]) {
 				this->change_to_auto.set(ModeContinue{});
+			}
+			else {
+				this->change_to_auto.set(std::nullopt);
 			}
 			// }
 			const auto manual_speed = Xyth::make (
@@ -229,9 +230,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 			this->manual_speed.set(manual_speed);
 			this->forward_speed.set(manual_speed.xy.y);
 
-			if(joy.buttons[Buttons::l_push]) {
-				this->collected_correctly.set(true);
-			}
+			this->collected_correctly.set(joy.buttons[Buttons::l_push]);
 		}
 
 		void balls_callback(nhk24_utils::msg::Balls&& balls) {
@@ -285,8 +284,6 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 
 			const auto servo_open = this->servo_open.get();
 			(void)servo_open;  // do nothing for now
-
-			printlns_to(std::osyncstream{std::cout}, "manual_speed: ", this->manual_speed.get());
 		}
 
 		void send_motor_speeds(const std::array<double, 4>& speeds) {
@@ -349,6 +346,7 @@ namespace nhk24_2nd_ws::r2::r2_node::impl {
 					};
 				}
 				, [node](PursuitOut&& out) {
+					printlns_to(std::osyncstream{std::cout}, "pursuit out:", out.target_speed);
 					node->target_speed.set(out.target_speed);
 				}
 			)

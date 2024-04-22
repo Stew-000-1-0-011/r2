@@ -14,6 +14,7 @@
 #include <my_include/std_types.hpp>
 #include <my_include/xyth.hpp>
 #include <my_include/lap_timer.hpp>
+#include <my_include/debug_print.hpp>
 
 #include "field_constant.hpp"
 
@@ -21,6 +22,7 @@ namespace nhk24_2nd_ws::r2::position_based_bahaviour::impl {
 	using namespace std::chrono_literals;
 	using xyth::Xy;
 	using lap_timer::LapTimer;
+	using debug_print::printlns_to;
 	using field_constant::Section;
 	using field_constant::is_plane;
 	using field_constant::where_am_i;
@@ -76,7 +78,7 @@ namespace nhk24_2nd_ws::r2::position_based_bahaviour::impl {
 				if(this->task->fut.wait_for(0s) == std::future_status::ready) {
 					this->task.reset();
 				}
-				else if(this->task->wait_timer.watch() > wait_duration) {
+				else if(this->task->wait_timer.watch().count() > wait_duration) {
 					this->task->ssource.request_stop();
 					if(this->next_arg) {
 						this->task = make_task(this->generator, *this->next_arg);
@@ -110,14 +112,20 @@ namespace nhk24_2nd_ws::r2::position_based_bahaviour::impl {
 		}
 
 		void update(const Xy& current_pose) noexcept {
+			this->amcl_fut.update();
+			this->map_fut.update();
+
 			const auto next_section = where_am_i(current_pose, this->now);
+			// printlns_to(std::osyncstream{std::cout}, "next_section: ", int(next_section));
 
 			if(next_section != this->now) {
 				this->now = next_section;
 
 				if(is_plane(next_section)) {
+					printlns_to(std::osyncstream{std::cout}, "change next_section: ", int(next_section));
 					this->amcl_fut.set(true);
 					this->map_fut.set(Section::to_filepath(next_section));
+
 				}
 				else {
 					this->amcl_fut.set(false);

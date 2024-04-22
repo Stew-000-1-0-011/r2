@@ -90,7 +90,7 @@ namespace nhk24_2nd_ws::r2::modes::pursuit::impl {
 						, XythPid::make (
 							XythScalar::from(1.0)
 							, XythScalar::from(0.0)
-							, XythScalar::from(0.2)
+							, XythScalar::from(0.0)
 						)
 					)
 				};

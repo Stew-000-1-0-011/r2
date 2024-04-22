@@ -28,6 +28,7 @@ namespace nhk24_2nd_ws::r2::modes::collect_ball::impl {
 		static constexpr auto name = ModeName::collect_ball;
 
 		struct In final {
+			// Xyth current_pose;
 			Xyth current_speed;
 			std::optional<double> ball_direction;
 			double forward_speed;
@@ -56,6 +57,8 @@ namespace nhk24_2nd_ws::r2::modes::collect_ball::impl {
 				printlns_to(std::osyncstream{std::cout}, "ball collected correctly.");
 				return ModeOutput<Out>::template change<ModeName::goto_silo_watch_point>(Void{});
 			}
+
+			// if(in.current_pose)
 
 			if(in.ball_direction) {
 				this->lost_timer.reset();

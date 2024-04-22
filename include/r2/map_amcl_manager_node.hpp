@@ -8,6 +8,7 @@
 #include <future>
 #include <functional>
 #include <string_view>
+#include <string>
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -21,6 +22,7 @@
 #include <lifecycle_msgs/srv/change_state.hpp>
 #include <nav2_msgs/srv/load_map.hpp>
 #include <nhk24_utils/msg/twist2d.hpp>
+#include <can_plugins2/msg/frame.hpp>
 
 #include <my_include/void.hpp>
 #include <my_include/xyth.hpp>
@@ -33,6 +35,7 @@
 #include "ros2_utils.hpp"
 
 namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
+	using namespace std::string_literals;
 	using namespace std::chrono_literals;
 	using void_::Void;
 	using xyth::Xy;
@@ -51,6 +54,7 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 		tf2_ros::Buffer tf2_buffer;
 		tf2_ros::TransformListener tf2_listener;
 
+		rclcpp::Publisher<can_plugins2::msg::Frame>::SharedPtr can_tx_pub;
 		rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_pub;
 		rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr map_server_change_state_client;
 		rclcpp::Client<lifecycle_msgs::srv::ChangeState>::SharedPtr amcl_change_state_client;
@@ -69,6 +73,7 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 		, tf2_broadcaster{this}
 		, tf2_buffer{this->get_clock()}
 		, tf2_listener{this->tf2_buffer}
+		, can_tx_pub{this->create_publisher<can_plugins2::msg::Frame>("can_tx", 10)}
 		, initial_pose_pub{this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 10)}
 		, map_server_change_state_client(this->create_client<lifecycle_msgs::srv::ChangeState>("map_server/change_state"))
 		, amcl_change_state_client(this->create_client<lifecycle_msgs::srv::ChangeState>("amcl/change_state"))
@@ -89,6 +94,10 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 		, done{Mutexed<bool>::make(false)}
 		, initpose_sub{this->create_subscription<nhk24_utils::msg::Twist2d>("r2/initialpose", 1, [this](const nhk24_utils::msg::Twist2d::SharedPtr msg) {
 			const auto pose_in_map = Xyth::make(Xy::make(msg->linear.x, msg->linear.y), msg->angular);
+			can_plugins2::msg::Frame can_frame{};
+			can_frame.id = 0x557;
+			can_frame.dlc = 1;
+			this->can_tx_pub->publish(can_frame);
 			this->reset_pose(pose_in_map);
 		})}
 		, timer{this->create_wall_timer(10ms, [this]() {
@@ -109,18 +118,25 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 
 		void reset_pose(const Xyth& pose_in_map) {
 			auto wait_timer = LapTimer::make();
-			while(wait_timer.watch().count() < 0.5) {
+			while(wait_timer.watch().count() < 1.0) {
 				if(auto pose_in_odom = get_pose(this->tf2_buffer, "odom", "true_base_link")) {
-					auto t = make_transform_stamped("map", "odom", this->now(), calc_transform(pose_in_map, *pose_in_odom));
+					// auto t_xyth = calc_transform(pose_in_map, *pose_in_odom);
+					auto t_xyth = pose_in_map;
+					auto t = make_transform_stamped("map", "odom", this->now(), t_xyth);
 					tf2_broadcaster.sendTransform(t);
 					auto p = make_pose_stamped("map", this->now(), pose_in_map);
 					initial_pose_pub->publish(p);
+
+					printlns_to(std::osyncstream{std::cout}, "reset transform", t_xyth);
+					printlns_to(std::osyncstream{std::cout}, "reset pose", pose_in_map);
 				}
 			}
 			printlns_to(std::osyncstream{std::cout}, __FILE__, __LINE__, "fail to get pose in odom.");
 		}
 
 		auto change_amcl(std::stop_token&& st, const bool change_to_active) -> std::future<void> {
+			printlns_to(std::osyncstream{std::cout}, "change_amcl: ", change_to_active ? "T" : "F");
+
 			auto req = std::make_shared<lifecycle_msgs::srv::ChangeState::Request>();
 			req->transition.id = change_to_active ? lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE : lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE;
 			auto res = this->map_server_change_state_client->async_send_request(req);
@@ -135,8 +151,10 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 		}
 
 		auto change_map(std::stop_token&& st, const std::string_view map_name) -> std::future<void> {
+			printlns_to(std::osyncstream{std::cout}, "change_map: ", map_name);
+
 			auto req = std::make_shared<nav2_msgs::srv::LoadMap::Request>();
-			req->map_url = std::string(map_name);
+			req->map_url = "./map/"s + std::string(map_name) + ".yaml";
 			auto res = this->load_map_client->async_send_request(req);
 			return std::async(std::launch::async, [st = std::move(st), res = std::move(res)]() mutable {
 				while(!st.stop_requested()) {
@@ -252,7 +270,7 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 						auto fut = this->change_map(ssource.get_token(), Section::to_filepath(Section::area1));
 
 						auto ret = this->busy_loop([this, &ssource, &fut]() -> std::optional<Void> {
-							if(fut.wait_for(100ms) == std::future_status::ready) {
+							if(fut.wait_for(1000ms) == std::future_status::ready) {
 								fut.get();
 								return Void{};
 							}
@@ -286,8 +304,8 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 			p.pose.pose.position.z = 0.0;
 			p.pose.pose.orientation.x = 0.0;
 			p.pose.pose.orientation.y = 0.0;
-			p.pose.pose.orientation.z = std::sin(xyth.th / 2);
-			p.pose.pose.orientation.w = std::cos(xyth.th / 2);
+			p.pose.pose.orientation.z = std::sin(xyth.th);
+			p.pose.pose.orientation.w = std::cos(xyth.th);
 			return p;
 		}
 
@@ -301,8 +319,8 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 			t.transform.translation.z = 0.0;
 			t.transform.rotation.x = 0.0;
 			t.transform.rotation.y = 0.0;
-			t.transform.rotation.z = std::sin(xyth.th / 2);
-			t.transform.rotation.w = std::cos(xyth.th / 2);
+			t.transform.rotation.z = std::sin(xyth.th);
+			t.transform.rotation.w = std::cos(xyth.th);
 			return t;
 		}
 
