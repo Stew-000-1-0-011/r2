@@ -93,8 +93,8 @@ namespace nhk24_2nd_ws::r2::field_constant::impl {
 	#if 1
 	namespace points {
 		// start point of robot
-		inline constexpr Xy area1_start = /* @todo: 実装 */Xy::zero();
-		inline constexpr Xy area2_start = /* @todo: 実装 */Xy::zero();
+		inline constexpr Xy area1_start = Xy::make(5.475, 0.350);
+		inline constexpr Xy area2_start = Xy::make(5.525, 5.500);
 
 
 		// begin and end point of slopes

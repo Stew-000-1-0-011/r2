@@ -4,7 +4,7 @@ project(r2)
 set(CMAKE_CXX_COMPILER "/usr/bin/g++-13")  #
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic -std=c++23 -fconcepts-diagnostics-depth=3 -Wno-subobject-linkage -O2 -fmax-errors=1)  #
+  add_compile_options(-Wall -Wextra -Wpedantic -std=c++23 -fconcepts-diagnostics-depth=3 -Wno-subobject-linkage -O2 -fmax-errors=5)  #
 endif()
 
 # find dependencies

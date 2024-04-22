@@ -23,6 +23,7 @@
 #include <nhk24_utils/msg/twist2d.hpp>
 
 #include <my_include/void.hpp>
+#include <my_include/xyth.hpp>
 #include <my_include/mutexed.hpp>
 #include <my_include/debug_print.hpp>
 #include <my_include/lap_timer.hpp>
@@ -34,11 +35,15 @@
 namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 	using namespace std::chrono_literals;
 	using void_::Void;
+	using xyth::Xy;
+	using xyth::Xyth;
+	using xyth::XyOp;
 	using mutexed::Mutexed;
 	using debug_print::printlns_to;
 	using lap_timer::LapTimer;
 	using position_based_bahaviour::PositionBasedBehaviour;
 	using field_constant::Section;
+	namespace poses = field_constant::poses;
 	using ros2_utils::get_pose;
 
 	struct MapAmclManagerNode : rclcpp::Node {
@@ -83,18 +88,8 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 		, killed{Mutexed<bool>::make(false)}
 		, done{Mutexed<bool>::make(false)}
 		, initpose_sub{this->create_subscription<nhk24_utils::msg::Twist2d>("r2/initialpose", 1, [this](const nhk24_utils::msg::Twist2d::SharedPtr msg) {
-			
 			const auto pose_in_map = Xyth::make(Xy::make(msg->linear.x, msg->linear.y), msg->angular);
-			auto wait_timer = LapTimer::make();
-			while(wait_timer.watch().count() < 0.5) {
-				if(auto pose_in_odom = get_pose(this->tf2_buffer, "odom", "true_base_link")) {
-					auto t = make_transform_stamped("map", "odom", this->now(), calc_transform(pose_in_map, *pose_in_odom));
-					tf2_broadcaster.sendTransform(t);
-					auto p = make_pose_stamped("map", this->now(), pose_in_map);
-					initial_pose_pub->publish(p);
-				}
-			}
-			printlns_to(std::osyncstream{std::cout}, __FILE__, __LINE__, "fail to get pose in odom.");
+			this->reset_pose(pose_in_map);
 		})}
 		, timer{this->create_wall_timer(10ms, [this]() {
 			if(const auto current_pose = get_pose(this->tf2_buffer, "map", "true_base_link")) {
@@ -110,6 +105,19 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 
 		void kill() {
 			this->killed.set(true);
+		}
+
+		void reset_pose(const Xyth& pose_in_map) {
+			auto wait_timer = LapTimer::make();
+			while(wait_timer.watch().count() < 0.5) {
+				if(auto pose_in_odom = get_pose(this->tf2_buffer, "odom", "true_base_link")) {
+					auto t = make_transform_stamped("map", "odom", this->now(), calc_transform(pose_in_map, *pose_in_odom));
+					tf2_broadcaster.sendTransform(t);
+					auto p = make_pose_stamped("map", this->now(), pose_in_map);
+					initial_pose_pub->publish(p);
+				}
+			}
+			printlns_to(std::osyncstream{std::cout}, __FILE__, __LINE__, "fail to get pose in odom.");
 		}
 
 		auto change_amcl(std::stop_token&& st, const bool change_to_active) -> std::future<void> {
@@ -256,6 +264,10 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 						return ret;
 					}
 				)
+				.and_then([this](Void) -> std::optional<Void> {
+					this->reset_pose(poses::area1_starting);
+					return Void{};
+				})
 				.and_then([](Void) -> std::optional<Void> {
 					printlns_to(std::osyncstream{std::cout}, "setup completed.");
 					return Void{};
@@ -292,6 +304,12 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 			t.transform.rotation.z = std::sin(xyth.th / 2);
 			t.transform.rotation.w = std::cos(xyth.th / 2);
 			return t;
+		}
+
+		static auto calc_transform(const Xyth& pose_from, const Xyth& pose_to) -> Xyth {
+			const double th = pose_to.th - pose_from.th;
+			const Xy xy = pose_to.xy -XyOp{}- pose_from.xy.rot(-th);
+			return Xyth::make(xy, th);
 		}
 	};
 }
