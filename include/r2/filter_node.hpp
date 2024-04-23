@@ -41,9 +41,6 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 	using robot_config::shadow_window;
 
 	struct FilterNode final : rclcpp::Node {
-		sensor_msgs::msg::LaserScan last_msgs{};
-		std::future<std::shared_ptr<std_srvs::srv::Empty_Response>> last_future{};
-
 		tf2_ros::Buffer tf_buffer;
 		tf2_ros::TransformListener tf_listener;
 
@@ -85,12 +82,12 @@ namespace nhk24_2nd_ws::r2::filter_node::impl {
 					, *base_pose
 					, footprint_half_diagonal
 				)
-				, BoxFilter::make (
-					*lidar_pose
-					, Xyth::make(area_half_diagonal +XyOp{}+ Xy::make(0.050, 0.050), 0.0)
-					// , *base_pose
-					, area_half_diagonal *XyOp{}* 1.1
-				)
+				// , BoxFilter::make (
+				// 	*lidar_pose
+				// 	, Xyth::make(area_half_diagonal +XyOp{}+ Xy::make(0.050, 0.050), 0.0)
+				// 	// , *base_pose
+				// 	, area_half_diagonal *XyOp{}* 1.1
+				// )
 				// , ShadowFilter::make (
 				// 	shadow_filter_threshold_angle
 				// 	, shadow_window

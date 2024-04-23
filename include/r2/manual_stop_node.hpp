@@ -31,7 +31,7 @@ namespace nhk24_2nd_ws::r2::manual_stop_node::impl {
 
 		ManualStopNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
 			: rclcpp::Node("manual_stop_node", options)
-			, can_pub(this->create_publisher<robomas_plugins::msg::Frame>("robomas_can_tx", 10))
+			, can_pub(this->create_publisher<robomas_plugins::msg::Frame>("robomas_can_tx2", 10))
 			, robomas_pub(this->create_publisher<robomas_plugins::msg::RobomasFrame>("robomas_frame", 10))
 			, robomas2_pub(this->create_publisher<robomas_plugins::msg::RobomasFrame>("robomas_frame2", 10))
 			, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) {

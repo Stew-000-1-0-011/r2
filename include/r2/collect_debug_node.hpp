@@ -72,7 +72,7 @@ namespace nhk24_2nd_ws::r2::collect_debug_node::impl {
 				}
 				return pubs;
 			}())
-			, can_tx(this->create_publisher<robomas_plugins::msg::Frame>("robomas_can_tx", 10))
+			, can_tx(this->create_publisher<robomas_plugins::msg::Frame>("robomas_can_tx2", 10))
 			, joy_sub(this->create_subscription<sensor_msgs::msg::Joy>("joy", 10, [this](const sensor_msgs::msg::Joy::SharedPtr msg) {
 				if(msg->buttons[Buttons::lb]) {
 					this->collect.set(Rotation::cw);

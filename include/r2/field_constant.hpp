@@ -110,7 +110,7 @@ namespace nhk24_2nd_ws::r2::field_constant::impl {
 		inline constexpr Xy storage_center = Xy::make(4.750, 10.000);
 
 		// silo watch point
-		inline constexpr Xy silo_watch_point = Xy::make(0.2300, 10.00);
+		inline constexpr Xy silo_watch_point = Xy::make(2.300, 10.00);
 
 		// front points of silo
 		inline constexpr Xy silos[5] = {
