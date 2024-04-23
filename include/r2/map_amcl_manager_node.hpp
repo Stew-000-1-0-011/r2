@@ -304,8 +304,8 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 			p.pose.pose.position.z = 0.0;
 			p.pose.pose.orientation.x = 0.0;
 			p.pose.pose.orientation.y = 0.0;
-			p.pose.pose.orientation.z = std::sin(xyth.th);
-			p.pose.pose.orientation.w = std::cos(xyth.th);
+			p.pose.pose.orientation.z = std::sin(xyth.th / 2);
+			p.pose.pose.orientation.w = std::cos(xyth.th / 2);
 			return p;
 		}
 
@@ -319,8 +319,8 @@ namespace nhk24_2nd_ws::r2::map_amcl_manager_node::impl {
 			t.transform.translation.z = 0.0;
 			t.transform.rotation.x = 0.0;
 			t.transform.rotation.y = 0.0;
-			t.transform.rotation.z = std::sin(xyth.th);
-			t.transform.rotation.w = std::cos(xyth.th);
+			t.transform.rotation.z = std::sin(xyth.th / 2);
+			t.transform.rotation.w = std::cos(xyth.th / 2);
 			return t;
 		}
 

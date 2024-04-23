@@ -19,6 +19,7 @@
 
 namespace nhk24_2nd_ws::r2::modes::pursuit::impl {
 	using void_::Void;
+	using xyth::Xy;
 	using xyth::Xyth;
 	using xyth::XythScalar;
 	using debug_print::printlns_to;
@@ -106,9 +107,17 @@ namespace nhk24_2nd_ws::r2::modes::pursuit::impl {
 				return ModeOutput<Out>::template change<ModeName::terminate>(Void{});
 			}
 
-			auto target_speed = pacman->update(in.current_pose, in.current_speed);
-			if(target_speed) {
-				return ModeOutput<Out>::output(Out{std::move(*target_speed)});
+			auto global_target_speed = pacman->update(in.current_pose, in.current_speed);
+			if(global_target_speed) {
+				const auto target_speed = global_target_speed->norm().xy > 0.3 ? Xyth::make (
+					global_target_speed->xy
+					, 0.0
+				) : Xyth::make (
+					Xy::zero()
+					, global_target_speed->th
+				);
+
+				return ModeOutput<Out>::output(Out{target_speed});
 			}
 			else {
 				return ModeOutput<Out>::template change<next_>(Void{});
